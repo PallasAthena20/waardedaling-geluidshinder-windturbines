@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Waardedaling &amp; Geluidshinder Windturbines — rekenmodel</title>
+<meta name="description" content="Bereken de waardedaling (Droës &amp; Koster, 2021) en de geluidshinder van woningen rond geplande windturbines op elke locatie in Nederland." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@500,600,700&f[]=satoshi@400,500,600,700&display=swap" rel="stylesheet" />
+
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%230d6f66'/%3E%3C/svg%3E" />
+
+<link rel="stylesheet" href="./base.css" />
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+<a class="sr-only" href="#main">Ga naar hoofdinhoud</a>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Waardedaling Windturbines — home">
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <circle cx="16" cy="9" r="2.1" fill="currentColor"/>
+        <path d="M16 9 L16 6.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M16 9 L23 12.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M16 9 L10.5 14.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M16 9 L16 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M16 21 L24.5 26" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <path d="M19.5 25.3 L24.5 26 L23.6 21.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <span>
+        <span class="brand-name">Waardedaling &amp; Geluidshinder</span>
+        <span class="brand-sub">Windturbines — twee modules</span>
+      </span>
+    </a>
+    <button class="theme-toggle" data-theme-toggle type="button" aria-label="Schakel naar donkere modus">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero" id="top">
+    <div class="wrap">
+      <p class="eyebrow">Gratis rekenmodel · elke locatie in Nederland</p>
+      <h1>Waardedaling &amp; geluidshinder van windturbines</h1>
+      <p>Geef aan waar een of meer windturbines gepland zijn. Module 1 berekent de waardedaling van woningen volgens het model van <a href="https://doi.org/10.1016/j.enpol.2021.112327" target="_blank" rel="noopener noreferrer">Droës &amp; Koster (2021)</a> (inclusief de 4%-NMR-splitsing). Module 2 berekent daaronder, voor dezelfde locatie(s), het geluidsniveau en de geluidshinder op vijf vaste afstanden (500 / 1.000 / 1.200 / 5.000 / 10.000 m), met de bijbehorende geschatte zorgkosten.</p>
+      <div class="hero-meta">
+        <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg> Werkt voor elke plaats, straat, postcode of GPS-coördinaat</span>
+        <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18.4 8.6 12 15 8.5 11.5 3.5 16.5"/></svg> Peer-reviewed methodiek (Energy Policy 2021, RIVM, TNO)</span>
+        <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg> Actuele CBS-cijfers per buurt</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="app" style="padding-top:0;">
+    <div class="wrap">
+      <div class="app-grid">
+
+        <!-- Input panel -->
+        <div class="card" id="input-panel">
+          <h2>Windturbines invoeren</h2>
+          <p class="card-desc">Zoek een plaats, adres of postcode, of geef exacte coördinaten op — handig als de turbine in een weiland komt te staan, zonder adres. Kies daarna de tiphoogte-categorie en voeg zoveel turbines toe als in jouw plan zijn opgenomen.</p>
+
+          <div class="field">
+            <div class="location-mode-tabs" role="tablist" aria-label="Manier van locatie opgeven">
+              <button type="button" class="location-mode-tab active" id="mode-tab-search" role="tab" aria-selected="true">Zoeken op adres/plaats</button>
+              <button type="button" class="location-mode-tab" id="mode-tab-coords" role="tab" aria-selected="false">Coördinaten invoeren</button>
+            </div>
+
+            <div id="mode-panel-search">
+              <label for="location-search">Locatie van de turbine</label>
+              <div class="search-wrap">
+                <input type="text" id="location-search" placeholder="Bijv. Cattenbroek, Montfoort of een postcode" autocomplete="off" />
+                <div class="suggestions" id="suggestions" role="listbox"></div>
+              </div>
+              <span class="field-hint" id="location-hint">Begin met typen — resultaten via de PDOK Locatieserver.</span>
+            </div>
+
+            <div id="mode-panel-coords" style="display:none;">
+              <label for="coords-input">Coördinaten (breedtegraad, lengtegraad)</label>
+              <div class="coords-row">
+                <input type="text" id="coords-input" placeholder="Bijv. 52.04041, 4.95839" autocomplete="off" inputmode="decimal" />
+                <button type="button" class="btn btn-secondary" id="coords-confirm-btn">Bevestig</button>
+              </div>
+              <button type="button" class="btn btn-secondary btn-block btn-pick-map" id="coords-pick-map-btn" style="margin-top: var(--space-2);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6.2-7-11a7 7 0 1 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                Of wijs de locatie aan op de kaart
+              </button>
+              <span class="field-hint" id="coords-hint">WGS84-decimale graden — plak dit rechtstreeks vanuit Google Maps (rechtsklik op de kaart) of een GPS-toestel.</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="category-select">Tiphoogte-categorie</label>
+            <select id="category-select">
+              <option value="laag">Laag (&lt; 50 m tiphoogte)</option>
+              <option value="midden">Midden (50 - 150 m tiphoogte)</option>
+              <option value="hoog" selected>Hoog (&gt; 150 m tiphoogte)</option>
+            </select>
+            <span class="field-hint" id="category-hint"></span>
+          </div>
+
+          <div class="field" id="method-field">
+            <label>Berekeningsmethode</label>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" name="method" value="vlak" checked />
+                <span>
+                  <span class="opt-title">Methode A — vlak percentage</span>
+                  <span class="opt-desc">Eén vast percentage (−5,4%) voor alle woningen binnen 2 km. Meest directe cijfer uit het rapport (Fig. 4b).</span>
+                </span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="method" value="afstandsband" />
+                <span>
+                  <span class="opt-title">Methode B — per afstandsband</span>
+                  <span class="opt-desc">Effect neemt af met de afstand (Fig. 6): van −8,3% op 500-750m tot −2,5% op 1500-2000m.</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <button class="btn btn-primary btn-block" id="add-turbine-btn" type="button" style="margin-top: var(--space-5);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Turbine toevoegen
+          </button>
+
+          <div class="turbine-list" id="turbine-list"></div>
+          <div class="empty-state" id="empty-state">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+            Nog geen turbines toegevoegd
+          </div>
+
+          <button class="btn btn-primary btn-block" id="calculate-btn" type="button" disabled style="margin-top: var(--space-6);">
+            Berekenen
+          </button>
+        </div>
+
+        <!-- Map -->
+        <div class="card">
+          <h2>Kaart</h2>
+          <p class="card-desc">Klik op een buurt voor details. Kleurintensiteit toont de berekende waardedaling na een berekening.</p>
+          <div id="map" style="margin-top: var(--space-4);"></div>
+          <div class="map-legend">
+            <span class="lg-item"><span class="swatch" style="background:var(--sev-0)"></span>&lt; 2%</span>
+            <span class="lg-item"><span class="swatch" style="background:var(--sev-1)"></span>2 - 3%</span>
+            <span class="lg-item"><span class="swatch" style="background:var(--sev-2)"></span>3 - 4,5%</span>
+            <span class="lg-item"><span class="swatch" style="background:var(--sev-3)"></span>4,5 - 6,5%</span>
+            <span class="lg-item"><span class="swatch" style="background:var(--sev-4)"></span>&gt; 6,5%</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <section id="results">
+    <div class="wrap">
+      <p class="eyebrow">Module 1 — Resultaat</p>
+      <h2 style="font-size: var(--text-xl); font-weight:650; margin-top: var(--space-2);">Berekende waardedaling</h2>
+
+      <div id="result-warnings"></div>
+
+      <div class="kpi-grid" id="kpi-grid"></div>
+
+      <div class="results-toolbar">
+        <h2 style="font-size: var(--text-lg);">Resultaten per buurt</h2>
+        <button class="btn btn-secondary" id="export-csv-btn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 21h16"/></svg>
+          Exporteer CSV
+        </button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="results-table" id="results-table">
+          <thead>
+            <tr>
+              <th data-key="buurtnaam">Buurt</th>
+              <th data-key="gemeentenaam">Gemeente</th>
+              <th class="num" data-key="afstand_centroide_m">Afstand</th>
+              <th class="num" data-key="geraakte_woningen">Woningen</th>
+              <th class="num" data-key="gemiddelde_woz">Gem. WOZ</th>
+              <th class="num" data-key="gewogen_waardedaling_pct">Waardedaling %</th>
+              <th class="num" data-key="totale_waardedaling_euro">Totale waardedaling</th>
+              <th class="num" data-key="eigen_risico_euro">Eigen risico (≤4%)</th>
+              <th class="num" data-key="nadeelcompensatie_euro">Compensabel (&gt;4%)</th>
+            </tr>
+          </thead>
+          <tbody id="results-tbody"></tbody>
+          <tfoot>
+            <tr class="results-total" id="results-total-row"></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Geluidshinder -->
+  <section id="noise-results">
+    <div class="wrap">
+      <p class="eyebrow">Module 2 — Resultaat</p>
+      <h2 style="font-size: var(--text-xl); font-weight:650; margin-top: var(--space-2);">Geluidshinder per afstand</h2>
+      <p style="color: var(--color-text-muted); max-width: 68ch; margin-top: var(--space-2);">
+        Voor dezelfde ingevoerde turbinelocatie(s) berekent het model het geluidsniveau en de hinderkans op vijf vaste afstanden van de turbine, uitgaande van een bronvermogen van <strong>108 dB(A)</strong> (A-gewogen) / <strong>117 dB</strong> (onweighted) bij 7 m/s windsnelheid.
+      </p>
+
+      <div class="table-wrap" style="margin-top: var(--space-6);">
+        <table class="results-table" id="noise-table">
+          <thead>
+            <tr>
+              <th rowspan="2" class="num">Afstand</th>
+              <th rowspan="2" class="num">Woningen binnen afstand</th>
+              <th rowspan="2" class="num">dB(A) bij 7 m/s</th>
+              <th rowspan="2" class="num">dB (onweighted)</th>
+              <th rowspan="2" class="num">% hinder</th>
+              <th rowspan="2" class="num">% ernstige hinder</th>
+              <th colspan="3" class="num noise-group-th">≥ 10% hinder</th>
+              <th colspan="3" class="num noise-group-th">≥ 30% hinder</th>
+            </tr>
+            <tr>
+              <th class="num">Woningen</th>
+              <th class="num">Kosten / jaar</th>
+              <th class="num">Kosten / 25 jaar</th>
+              <th class="num">Woningen</th>
+              <th class="num">Kosten / jaar</th>
+              <th class="num">Kosten / 25 jaar</th>
+            </tr>
+          </thead>
+          <tbody id="noise-tbody"></tbody>
+        </table>
+      </div>
+
+      <div id="noise-empty" class="empty-state" style="margin-top: var(--space-4);">
+        <p>Voer hierboven één of meer turbinelocaties in en klik op "Berekenen" om ook de geluidshinder-tabel te vullen.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Methodology -->
+  <section id="methodology">
+    <div class="wrap" style="max-width: var(--content-default);">
+      <p class="eyebrow">Verantwoording</p>
+      <h2 style="font-size: var(--text-xl); font-weight:650; margin-top: var(--space-2);">Methodologie &amp; bronnen</h2>
+
+      <div id="accordion">
+        <div class="accordion-item" data-open="true">
+          <button class="accordion-trigger" type="button">
+            Hoe rekent het model?
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="accordion-panel">
+            <p>Voor elke ingevoerde turbine bepaalt het model een invloedscirkel: 1 km voor lage turbines (&lt;50m) en 2 km voor midden- en hoge turbines, conform de afstanden waarbinnen Droës &amp; Koster (2021) een significant effect meten. Voor hoge turbines kan gekozen worden voor het vlakke effectpercentage (Fig. 4b) of het per afstandsband afnemende percentage (Fig. 6).</p>
+            <p>Binnen deze invloedscirkel(s) bepaalt het model welk deel van elke CBS-buurt overlapt met de invloedszone en rekent het aantal geraakte woningen naar rato van dat oppervlakteaandeel toe (dezelfde grid-logica als gebruikt door TNO in "De impact van windturbines op huizenprijzen", 2022). Als een buurt binnen bereik van meerdere turbines valt, telt het sterkste effect — er wordt niet dubbel geteld.</p>
+            <p>De gemiddelde WOZ-waarde en het woningaantal per buurt komen rechtstreeks uit de actuele CBS Kerncijfers wijken en buurten, ontsloten via PDOK. Adressen en plaatsnamen worden herkend via de PDOK Locatieserver (BZK).</p>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-trigger" type="button">
+            Effectpercentages uit Droës &amp; Koster (2021)
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="accordion-panel">
+            <p>Bron: M.I. Droës &amp; H.R.A. Koster, "Wind turbines, solar farms, and house prices", <em>Energy Policy</em> 155 (2021), 112327. <a href="https://doi.org/10.1016/j.enpol.2021.112327" target="_blank" rel="noopener noreferrer">doi.org/10.1016/j.enpol.2021.112327</a>.</p>
+            <table>
+              <thead><tr><th>Categorie</th><th>Bereik</th><th>Effect (vlak)</th><th>Toelichting</th></tr></thead>
+              <tbody>
+                <tr><td>Laag (&lt;50m)</td><td>1 km</td><td>−1,0%</td><td>Niet significant in de meeste specificaties — indicatief.</td></tr>
+                <tr><td>Midden (50-150m)</td><td>2 km</td><td>−3,0%</td><td>Significant; geen gepubliceerde afstandsbanden, daarom alleen vlak percentage.</td></tr>
+                <tr><td>Hoog (&gt;150m)</td><td>2 km</td><td>−5,4%</td><td>Meest robuuste cijfer (Fig. 4b, gecontroleerd voor tijdsvariatie).</td></tr>
+              </tbody>
+            </table>
+            <p style="margin-top: var(--space-4);">Voor hoge turbines, afstandsbanden (Methode B, afgeleid uit Fig. 6):</p>
+            <table>
+              <thead><tr><th>Afstand</th><th>Effect</th></tr></thead>
+              <tbody>
+                <tr><td>500 - 1.000 m</td><td>−8,3%</td></tr>
+                <tr><td>1.000 - 1.500 m</td><td>−6,0%</td></tr>
+                <tr><td>1.500 - 2.000 m</td><td>−4,0%</td></tr>
+                <tr><td>2.000 - 2.500 m</td><td>−2,5%</td></tr>
+              </tbody>
+            </table>
+            <p><strong>Let op:</strong> de afstandsband-percentages zijn afgelezen uit een figuur in het rapport en zijn daarom een benadering, geen exacte regressiecoëfficiënten. Voor lage en midden-turbines publiceert het rapport geen afstandsbanden — het model gebruikt daar bewust alleen het vlakke percentage om geen valse precisie te suggereren.</p>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-trigger" type="button">
+            Normaal maatschappelijk risico (4%-regel)
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="accordion-panel">
+            <p>Volgens vaste jurisprudentie van de Afdeling bestuursrechtspraak van de Raad van State komt bij planschade een waardedaling tot 2-4% doorgaans voor rekening van de eigenaar als "normaal maatschappelijk risico" (NMR). Dit model hanteert 4% als grenswaarde: van de berekende waardedaling per (deel van een) buurt komt het eerste percentage tot 4% voor eigen risico, en alleen het deel daarboven wordt als potentieel compensabele planschade getoond.</p>
+            <p>Dit is een indicatieve, generieke toepassing van de 4%-vuistregel. De daadwerkelijke planschadevergoeding in een concrete casus wordt per geval vastgesteld door de bevoegde overheid, doorgaans met behulp van een onafhankelijk taxatierapport.</p>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-trigger" type="button">
+            Geluidsmodule — voortplanting en niveaus
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="accordion-panel">
+            <p>Het geluidsniveau op afstand R (meter) van de turbine wordt berekend met de vuistregel uit het RIVM-briefrapport 609333002 <em>"Windturbines: invloed op de beleving en gezondheid van omwonenden"</em> (bijlage 3, afgeleid van Pedersen et al., project WINDFARMperception, 2008):</p>
+            <p style="font-family: var(--font-mono, monospace); background: var(--color-surface-2); padding: var(--space-3); border-radius: var(--radius-md); display:inline-block;">L<sub>imm</sub> = L<sub>w</sub> − 20·log₁₀(R) − 9 − 0,005·R &nbsp;dB</p>
+            <p>Hierbij is L<sub>w</sub> het bronvermogenniveau van de turbine (108 dB(A) A-gewogen, resp. 117 dB onweighted/lineair, bij 7 m/s windsnelheid — waarden zoals opgegeven voor dit model) en R de afstand in meter. De formule heeft een nauwkeurigheid van ca. ±3 dB en is bedoeld als representatieve schatting voor één turbine op open, vlak terrein — lokale factoren (bodemdemping, obstakels, meerdere turbines) kunnen afwijkingen geven. Bron: <a href="https://www.platformstorm.nl/downloads/windturbines_ggd.pdf" target="_blank" rel="noopener noreferrer">RIVM briefrapport 609333002</a>.</p>
+            <p>De dB(A)-kolom gebruikt het A-gewogen bronvermogen (108 dB(A)); de dB-kolom (onweighted) gebruikt hetzelfde afstandsverval maar met het lineaire bronvermogen (117 dB) — een vereenvoudiging die dezelfde geometrische en atmosferische demping toepast op beide grootheden en dus indicatief is voor de onweighted kolom.</p>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-trigger" type="button">
+            Geluidsmodule — hinderpercentages en kosten
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="accordion-panel">
+            <p>Het percentage (algemeen) gehinderden en ernstig gehinderden wordt berekend met de dosis-effectrelaties uit S.A. Janssen, H. Vos &amp; A.R. Eisses, <em>"Hinder door geluid van windturbines: Dosis-effectrelaties op basis van Nederlandse en Zweedse gegevens"</em>, TNO-rapport 2008-D-R1051/B (2008), sectie 5.4 — buitenwaarden, gebaseerd op gecombineerde Zweedse (2000, 2005) en Nederlandse (2007) enquêtedata:</p>
+            <p style="font-size: var(--text-sm);">%hinder = 34,25 − 0,864·L − 0,0548·L² + 0,001551·L³<br/>%ernstige hinder = −97,94 + 9,627·L − 0,3175·L² + 0,003522·L³<br/><span style="color: var(--color-text-muted);">(L = geluidsniveau in dB(A), als benadering van L<sub>den</sub>)</span></p>
+            <p>Bron: <a href="https://www.tno.nl/media/2187/hinder_door_geluid_van_windturbines.pdf" target="_blank" rel="noopener noreferrer">TNO-rapport 2008-D-R1051/B</a>. Deze formules zijn gefit op L<sub>den</sub> = 29–50 dB(A); het model gebruikt daarom het berekende dB(A)-niveau bij 7 m/s als benadering ("proxy") van L<sub>den</sub>. Dat is een vereenvoudiging — een exacte L<sub>den</sub> vereist de volledige jaarlijkse windsnelheidsverdeling op de locatie, conform de RIVM-rekenmethodiek. Onder 29 dB wordt het hinderpercentage op 0% gezet (buiten het gevalideerde bereik, verwaarloosbaar effect); boven 50 dB wordt de invoerwaarde voor de polynoom afgetopt op 50 dB om extrapolatiefouten te vermijden.</p>
+            <p>De kolommen "≥10% hinder" en "≥30% hinder" tonen, per afstand, alle woningen binnen die straal áls het berekende hinderpercentage op die afstand de drempel bereikt of overschrijdt (0 woningen als de drempel niet gehaald wordt). Omdat het geluidsniveau afneemt met de afstand, geldt: als de drempel op afstand R gehaald wordt, hebben ook alle dichterbij gelegen woningen (binnen R) minstens dat hinderniveau.</p>
+            <p>De kosten per woning (€ 2.000 per jaar, oplopend tot € 2.000 × 25 = € 50.000 over 25 jaar) zijn een door de gebruiker opgegeven aanname voor gemiddelde jaarlijkse zorgkosten (huisarts, ziekenhuis e.d.) per getroffen woning bij aanhoudende geluidshinder. Dit is een vereenvoudigde, indicatieve aanname en geen resultaat van een gezondheidseconomische studie — gebruik deze kolom als eerste-orde inschatting, niet als exacte schadeclaim.</p>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <button class="accordion-trigger" type="button">
+            Databronnen
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="accordion-panel">
+            <p>Geocoding: <a href="https://www.pdok.nl/" target="_blank" rel="noopener noreferrer">PDOK Locatieserver</a> (Kadaster / BZK), gratis en zonder API-key.</p>
+            <p>Buurtgrenzen, woningvoorraad en gemiddelde WOZ-waarde: <a href="https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische-data/wijk-en-buurtkaart-2024" target="_blank" rel="noopener noreferrer">CBS Kerncijfers wijken en buurten</a>, ontsloten via de PDOK WFS-service.</p>
+            <p>Achtergrond nationale impact: TNO, <a href="#" target="_blank" rel="noopener noreferrer">"De impact van windturbines op huizenprijzen"</a> (2022), gebruikt ter validatie van de gehanteerde bufferbenadering.</p>
+            <p>Geluidsvoortplanting: RIVM, <a href="https://www.platformstorm.nl/downloads/windturbines_ggd.pdf" target="_blank" rel="noopener noreferrer">briefrapport 609333002 "Windturbines: invloed op de beleving en gezondheid van omwonenden"</a>.</p>
+            <p>Dosis-effectrelatie geluidshinder: TNO, <a href="https://www.tno.nl/media/2187/hinder_door_geluid_van_windturbines.pdf" target="_blank" rel="noopener noreferrer">rapport 2008-D-R1051/B "Hinder door geluid van windturbines"</a> (Janssen, Vos &amp; Eisses, 2008).</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <span>Waardedaling Windturbines — vrij te gebruiken rekenmodel, gebaseerd op openbare data en peer-reviewed onderzoek.</span>
+    <span>Geen juridisch advies. Raadpleeg bij een concrete planschadeprocedure een deskundige.</span>
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
