@@ -50,7 +50,7 @@
     <div class="wrap">
       <p class="eyebrow">Gratis rekenmodel · elke locatie in Nederland</p>
       <h1>Waardedaling &amp; geluidshinder van windturbines</h1>
-      <p>Geef aan waar een of meer windturbines gepland zijn. Module 1 berekent de waardedaling van woningen volgens het model van <a href="https://doi.org/10.1016/j.enpol.2021.112327" target="_blank" rel="noopener noreferrer">Droës &amp; Koster (2021)</a> (inclusief de 4%-NMR-splitsing). Module 2 berekent daaronder, voor dezelfde locatie(s), het geluidsniveau en de geluidshinder op vijf vaste afstanden (500 / 1.000 / 1.200 / 5.000 / 10.000 m), met de bijbehorende geschatte zorgkosten.</p>
+      <p>Geef aan waar een of meer windturbines gepland zijn. Module 1 berekent de waardedaling van woningen volgens het model van <a href="https://doi.org/10.1016/j.enpol.2021.112327" target="_blank" rel="noopener noreferrer">Droës &amp; Koster (2021)</a> (inclusief de 4%-NMR-splitsing). Module 2 berekent daaronder, voor dezelfde locatie(s), het geluidsniveau op vijf vaste afstanden (500 / 800 / 1.300 / 2.000 / 5.000 m), met de bijbehorende geluidshinder-aandelen en geschatte zorgkosten.</p>
       <div class="hero-meta">
         <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg> Werkt voor elke plaats, straat, postcode of GPS-coördinaat</span>
         <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18.4 8.6 12 15 8.5 11.5 3.5 16.5"/></svg> Peer-reviewed methodiek (Energy Policy 2021, RIVM, TNO)</span>
@@ -209,8 +209,26 @@
       <p class="eyebrow">Module 2 — Resultaat</p>
       <h2 style="font-size: var(--text-xl); font-weight:650; margin-top: var(--space-2);">Geluidshinder per afstand</h2>
       <p style="color: var(--color-text-muted); max-width: 68ch; margin-top: var(--space-2);">
-        Voor dezelfde ingevoerde turbinelocatie(s) berekent het model het geluidsniveau en de hinderkans op vijf vaste afstanden van de turbine, uitgaande van een bronvermogen van <strong>108 dB(A)</strong> (A-gewogen) / <strong>117 dB</strong> (onweighted) bij 7 m/s windsnelheid.
+        Voor dezelfde ingevoerde turbinelocatie(s) berekent het model het geluidsniveau op vijf vaste afstanden van de turbine, uitgaande van een bronvermogen van <strong>108 dB(A)</strong> (A-gewogen) / <strong>117 dB</strong> (onweighted) bij 7 m/s windsnelheid.
       </p>
+
+      <div class="card" style="margin-top: var(--space-5); max-width: 74ch;">
+        <h2>Drie soorten geluid</h2>
+        <p class="card-desc">Het geluid van een windturbine bestaat uit drie componenten met elk een ander frequentiebereik en een andere draagwijdte:</p>
+        <ul style="margin: var(--space-3) 0 0; padding-left: 1.2em; color: var(--color-text-muted); line-height: 1.6;">
+          <li><strong>Hoorbaar geluid</strong> — boven ca. 100-125 Hz, het geluid dat mensen bewust waarnemen.</li>
+          <li><strong>Laagfrequent geluid (LFG)</strong> — ca. 20-100/125 Hz. LFG draagt verder en dringt makkelijker door in woningen dan hoorbaar geluid, wat de meegenomen afstand van 5 km rechtvaardigt.</li>
+          <li><strong>Infrasoon geluid</strong> — onder de 20 Hz, bij windturbines doorgaans zeer zwak maar met een groot bereik.</li>
+        </ul>
+        <p style="margin-top: var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted);">Bron: <a href="https://repository.officiele-overheidspublicaties.nl/externebijlagen/exb-2026-7801/1/bijlage/exb-2026-7801.PDF" target="_blank" rel="noopener noreferrer">Notitie geluidsnorm windturbines, provincie Gelderland</a>. RIVM concludeert dat er vooralsnog geen bewijs is dat LFG/infrasoon van windturbines andere gezondheidseffecten geeft dan gewoon hoorbaar geluid van gelijke sterkte.</p>
+      </div>
+
+      <div class="card" style="margin-top: var(--space-5);">
+        <h2>Kaart — geluidscontouren</h2>
+        <p class="card-desc">Cirkels op 500 m, 800 m, 1.300 m, 2.000 m en 5.000 m rond elke ingevoerde turbine.</p>
+        <div id="noise-map" style="margin-top: var(--space-4);"></div>
+        <div class="map-legend" id="noise-map-legend"></div>
+      </div>
 
       <div class="table-wrap" style="margin-top: var(--space-6);">
         <table class="results-table" id="noise-table">
@@ -220,12 +238,15 @@
               <th rowspan="2" class="num">Woningen binnen afstand</th>
               <th rowspan="2" class="num">dB(A) bij 7 m/s</th>
               <th rowspan="2" class="num">dB (onweighted)</th>
-              <th rowspan="2" class="num">% hinder</th>
-              <th rowspan="2" class="num">% ernstige hinder</th>
-              <th colspan="3" class="num noise-group-th">10% hinder</th>
-              <th colspan="3" class="num noise-group-th">30% hinder</th>
+              <th rowspan="2" class="num">Pers. / huishouden</th>
+              <th colspan="3" class="num noise-group-th">Geluidshinder 10%</th>
+              <th colspan="3" class="num noise-group-th">Geluidshinder 30%</th>
+              <th colspan="3" class="num noise-group-th">Geluidshinder 46%</th>
             </tr>
             <tr>
+              <th class="num">Woningen</th>
+              <th class="num">Kosten / jaar</th>
+              <th class="num">Kosten / 25 jaar</th>
               <th class="num">Woningen</th>
               <th class="num">Kosten / jaar</th>
               <th class="num">Kosten / 25 jaar</th>
@@ -322,11 +343,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
           </button>
           <div class="accordion-panel">
-            <p>Het percentage (algemeen) gehinderden en ernstig gehinderden wordt berekend met de dosis-effectrelaties uit S.A. Janssen, H. Vos &amp; A.R. Eisses, <em>"Hinder door geluid van windturbines: Dosis-effectrelaties op basis van Nederlandse en Zweedse gegevens"</em>, TNO-rapport 2008-D-R1051/B (2008), sectie 5.4 — buitenwaarden, gebaseerd op gecombineerde Zweedse (2000, 2005) en Nederlandse (2007) enquêtedata:</p>
-            <p style="font-size: var(--text-sm);">%hinder = 34,25 − 0,864·L − 0,0548·L² + 0,001551·L³<br/>%ernstige hinder = −97,94 + 9,627·L − 0,3175·L² + 0,003522·L³<br/><span style="color: var(--color-text-muted);">(L = geluidsniveau in dB(A), als benadering van L<sub>den</sub>)</span></p>
-            <p>Bron: <a href="https://www.tno.nl/media/2187/hinder_door_geluid_van_windturbines.pdf" target="_blank" rel="noopener noreferrer">TNO-rapport 2008-D-R1051/B</a>. Deze formules zijn gefit op L<sub>den</sub> = 29–50 dB(A); het model gebruikt daarom het berekende dB(A)-niveau bij 7 m/s als benadering ("proxy") van L<sub>den</sub>. Dat is een vereenvoudiging — een exacte L<sub>den</sub> vereist de volledige jaarlijkse windsnelheidsverdeling op de locatie, conform de RIVM-rekenmethodiek. Onder 29 dB wordt het hinderpercentage op 0% gezet (buiten het gevalideerde bereik, verwaarloosbaar effect); boven 50 dB wordt de invoerwaarde voor de polynoom afgetopt op 50 dB om extrapolatiefouten te vermijden.</p>
-            <p>De kolommen "10% hinder" en "30% hinder" tonen, per afstand, het aantal woningen binnen die straal vermenigvuldigd met het betreffende percentage: aantal woningen binnen afstand R × 10% (resp. × 30%). Dit is een directe aanname over het aandeel woningen dat bij die afstand aantoonbare (resp. zwaardere) hinder ondervindt — geen drempeltoets op het berekende %hinder uit de TNO dosis-effectrelatie hierboven. De twee percentages worden op elke afstand onafhankelijk toegepast op het daar geldende woningaantal.</p>
-            <p>De kosten per woning (€ 2.000 per jaar, oplopend tot € 2.000 × 25 = € 50.000 over 25 jaar) zijn een door de gebruiker opgegeven aanname voor gemiddelde jaarlijkse zorgkosten (huisarts, ziekenhuis e.d.) per getroffen woning bij aanhoudende geluidshinder. Dit is een vereenvoudigde, indicatieve aanname en geen resultaat van een gezondheidseconomische studie — gebruik deze kolom als eerste-orde inschatting, niet als exacte schadeclaim.</p>
+            <p>De kolommen "Geluidshinder 10%", "30%" en "46%" tonen, per afstand, het aantal woningen binnen die straal vermenigvuldigd met het betreffende percentage: aantal woningen binnen afstand R × 10% (resp. × 30%, × 46%). Dit is een directe aanname over het aandeel woningen dat bij die afstand hinder ondervindt, onafhankelijk per drempel toegepast op het daar geldende woningaantal — geen drempeltoets op een dosis-effectcurve.</p>
+            <p>De 10%- en 30%-aandelen zijn door de gebruiker opgegeven indicatieve waarden. Het 46%-aandeel is ontleend aan een veldonderzoek waarin windturbinegeluid van 33-50 dB(A) door 46% van de respondenten die op 204-1.726 m van de dichtstbijzijnde turbine woonden als hinderlijk of zeer hinderlijk werd beoordeeld. Bron: Pawlaczyk-Łuszczyńska, M. e.a., <em>"Response to Noise Emitted by Wind Farms in People Living in Nearby Areas"</em>, International Journal of Environmental Research and Public Health 15(8) (2018), 1575, <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6121431/" target="_blank" rel="noopener noreferrer">pmc.ncbi.nlm.nih.gov/articles/PMC6121431</a>.</p>
+            <p>De kosten worden berekend per <strong>persoon</strong>, niet per woning: aantal getroffen woningen × gemiddeld aantal personen per huishouden (CBS "gemiddelde huishoudensgrootte", gewogen naar de buurten binnen de betreffende straal, met een landelijk gemiddelde van 2,1 als terugvalwaarde) × € 1.500 per persoon per jaar, oplopend tot × 25 jaar. Dit is een door de gebruiker opgegeven aanname voor gemiddelde jaarlijkse zorgkosten (huisarts, ziekenhuis e.d.) per getroffen persoon bij aanhoudende geluidshinder — een vereenvoudigde, indicatieve aanname en geen resultaat van een gezondheidseconomische studie. Gebruik deze kolommen als eerste-orde inschatting, niet als exacte schadeclaim.</p>
+            <p>Windturbinegeluid bestaat uit hoorbaar geluid, laagfrequent geluid (LFG, ca. 20-100/125 Hz) en infrasoon geluid (&lt; 20 Hz). LFG draagt verder en dringt makkelijker door in woningen, wat de 5 km-afstand in de tabel rechtvaardigt. Bron: <a href="https://repository.officiele-overheidspublicaties.nl/externebijlagen/exb-2026-7801/1/bijlage/exb-2026-7801.PDF" target="_blank" rel="noopener noreferrer">Notitie geluidsnorm windturbines, provincie Gelderland</a>.</p>
           </div>
         </div>
 
@@ -340,7 +360,9 @@
             <p>Buurtgrenzen, woningvoorraad en gemiddelde WOZ-waarde: <a href="https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische-data/wijk-en-buurtkaart-2024" target="_blank" rel="noopener noreferrer">CBS Kerncijfers wijken en buurten</a>, ontsloten via de PDOK WFS-service.</p>
             <p>Achtergrond nationale impact: TNO, <a href="#" target="_blank" rel="noopener noreferrer">"De impact van windturbines op huizenprijzen"</a> (2022), gebruikt ter validatie van de gehanteerde bufferbenadering.</p>
             <p>Geluidsvoortplanting: RIVM, <a href="https://www.platformstorm.nl/downloads/windturbines_ggd.pdf" target="_blank" rel="noopener noreferrer">briefrapport 609333002 "Windturbines: invloed op de beleving en gezondheid van omwonenden"</a>.</p>
-            <p>Dosis-effectrelatie geluidshinder: TNO, <a href="https://www.tno.nl/media/2187/hinder_door_geluid_van_windturbines.pdf" target="_blank" rel="noopener noreferrer">rapport 2008-D-R1051/B "Hinder door geluid van windturbines"</a> (Janssen, Vos &amp; Eisses, 2008).</p>
+            <p>46%-hindercijfer: Pawlaczyk-Łuszczyńska, M. e.a., <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC6121431/" target="_blank" rel="noopener noreferrer">"Response to Noise Emitted by Wind Farms in People Living in Nearby Areas"</a>, IJERPH 15(8) (2018).</p>
+            <p>Soorten geluid (hoorbaar / LFG / infrasoon): <a href="https://repository.officiele-overheidspublicaties.nl/externebijlagen/exb-2026-7801/1/bijlage/exb-2026-7801.PDF" target="_blank" rel="noopener noreferrer">Notitie geluidsnorm windturbines</a>, provincie Gelderland.</p>
+            <p>Gemiddelde huishoudensgrootte per buurt: <a href="https://www.cbs.nl/nl-nl/dossier/nederland-regionaal/geografische-data/wijk-en-buurtkaart-2024" target="_blank" rel="noopener noreferrer">CBS Kerncijfers wijken en buurten</a>, ontsloten via de PDOK WFS-service.</p>
           </div>
         </div>
       </div>

@@ -630,7 +630,8 @@ select:focus {
    Map
    ========================================================================== */
 
-#map {
+#map,
+#noise-map {
   width: 100%;
   height: 460px;
   border-radius: var(--radius-lg);
@@ -794,7 +795,7 @@ tfoot.results-total td {
 }
 
 #noise-table {
-  min-width: 1280px;
+  min-width: 1520px;
   cursor: default;
 }
 #noise-table thead th {
@@ -974,7 +975,8 @@ tfoot.results-total td {
    ========================================================================== */
 
 @media (max-width: 640px) {
-  #map {
+  #map,
+  #noise-map {
     height: 340px;
   }
   .results-toolbar {

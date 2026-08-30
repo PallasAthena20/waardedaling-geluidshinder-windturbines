@@ -414,6 +414,84 @@
   }
 
   /* ---------------------------------------------------------------------
+     Geluidshinder-kaart (Module 2) — vaste beoordelingsafstanden
+     --------------------------------------------------------------------- */
+  const NOISE_MAP_DISTANCES_M = [500, 800, 1300, 2000, 5000];
+  const NOISE_MAP_COLORS = ['#0d6f66', '#3d8f7a', '#7aad5c', '#d69a3a', '#c8553d'];
+
+  const noiseMap = new maplibregl.Map({
+    container: 'noise-map',
+    style: 'https://tiles.openfreemap.org/styles/positron',
+    center: [5.2913, 52.1326],
+    zoom: 6.4,
+  });
+  noiseMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+
+  let noiseMapReady = false;
+  noiseMap.on('load', () => {
+    noiseMapReady = true;
+    noiseMap.addSource('noise-circles', { type: 'geojson', data: emptyFC() });
+    noiseMap.addLayer({
+      id: 'noise-circles-line',
+      type: 'line',
+      source: 'noise-circles',
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': 1.8,
+      },
+    });
+    noiseMap.addSource('noise-markers', { type: 'geojson', data: emptyFC() });
+    noiseMap.addLayer({
+      id: 'noise-markers-point',
+      type: 'circle',
+      source: 'noise-markers',
+      paint: {
+        'circle-radius': 6,
+        'circle-color': '#0d6f66',
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#ffffff',
+      },
+    });
+    renderNoiseMapLegend();
+    renderNoiseMapCircles();
+  });
+
+  function renderNoiseMapLegend() {
+    const legendEl = document.getElementById('noise-map-legend');
+    if (!legendEl) return;
+    legendEl.innerHTML = NOISE_MAP_DISTANCES_M.map(
+      (d, i) => `<span class="lg-item"><span class="swatch" style="background:${NOISE_MAP_COLORS[i]}"></span>${fmtDist(d)}</span>`
+    ).join('');
+  }
+
+  function renderNoiseMapCircles() {
+    if (!noiseMapReady) return;
+    const circleFeatures = [];
+    const markerFeatures = [];
+    turbines.forEach((t) => {
+      NOISE_MAP_DISTANCES_M.forEach((d, i) => {
+        const circle = turf.circle([t.lon, t.lat], d / 1000, { steps: 64, units: 'kilometers' });
+        circle.properties = { id: t.id, color: NOISE_MAP_COLORS[i] };
+        circleFeatures.push(circle);
+      });
+      markerFeatures.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [t.lon, t.lat] },
+        properties: { id: t.id },
+      });
+    });
+    noiseMap.getSource('noise-circles') && noiseMap.getSource('noise-circles').setData({ type: 'FeatureCollection', features: circleFeatures });
+    noiseMap.getSource('noise-markers') && noiseMap.getSource('noise-markers').setData({ type: 'FeatureCollection', features: markerFeatures });
+    if (turbines.length === 1) {
+      noiseMap.flyTo({ center: [turbines[0].lon, turbines[0].lat], zoom: 10.5 });
+    } else if (turbines.length > 1) {
+      const bounds = new maplibregl.LngLatBounds();
+      turbines.forEach((t) => bounds.extend([t.lon, t.lat]));
+      noiseMap.fitBounds(bounds, { padding: 80, maxZoom: 11 });
+    }
+  }
+
+  /* ---------------------------------------------------------------------
      Turbine list UI
      --------------------------------------------------------------------- */
   const turbineListEl = document.getElementById('turbine-list');
@@ -445,6 +523,7 @@
         turbines = turbines.filter((x) => x.id !== t.id);
         renderTurbineList();
         renderMapCircles();
+        renderNoiseMapCircles();
         hideResults();
       });
       row.appendChild(removeBtn);
@@ -475,6 +554,7 @@
     });
     renderTurbineList();
     renderMapCircles();
+    renderNoiseMapCircles();
     hideResults();
     searchInput.value = '';
     coordsInput.value = '';
@@ -567,7 +647,7 @@
     const rows = data.rijen || [];
     noiseTbody.innerHTML = rows
       .map((row) => {
-        const [t10, t30] = row.drempels;
+        const [t10, t30, t46] = row.drempels;
         const cell = (d) => `
           <td class="num">${fmtNum(d.aantal_woningen, 1)}</td>
           <td class="num">${fmtEuro(d.kosten_per_jaar_euro)}</td>
@@ -578,13 +658,14 @@
         <td class="num">${fmtNum(row.aantal_woningen, 1)}</td>
         <td class="num">${fmtNum(row.dba_7ms, 1)} dB(A)</td>
         <td class="num">${fmtNum(row.db_onweighted, 1)} dB</td>
-        <td class="num">${fmtNum(row.pct_hinder, 1)}%</td>
-        <td class="num">${fmtNum(row.pct_ernstige_hinder, 1)}%</td>
+        <td class="num">${fmtNum(row.personen_per_huishouden, 2)}</td>
         ${cell(t10)}
         ${cell(t30)}
+        ${cell(t46)}
       </tr>`;
       })
       .join('');
+    renderNoiseMapCircles();
   }
 
   function renderResults(data) {

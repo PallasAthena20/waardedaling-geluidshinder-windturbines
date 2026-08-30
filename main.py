@@ -40,33 +40,53 @@ CBS_WFS = "https://service.pdok.nl/cbs/wijkenbuurten/2024/wfs/v1_0"
 NMR_THRESHOLD = 0.04  # 4% normaal maatschappelijk risico
 
 # ---------------------------------------------------------------------------
-# Geluidshinder-module (nieuw)
+# Geluidshinder-module
 # ---------------------------------------------------------------------------
 # Bronvermogen turbine bij 7 m/s (door gebruiker opgegeven referentiewaarde,
 # representatief voor een moderne turbine van ca. 3-4 MW):
 NOISE_LW_A = 108.0   # dB(A), A-gewogen bronvermogenniveau
 NOISE_LW_LIN = 117.0  # dB,   lineair (onweighted) bronvermogenniveau
 
-# Vaste beoordelingsafstanden zoals opgegeven door gebruiker
-NOISE_DISTANCES_M = [500, 1000, 1200, 5000, 10000]
+# Windturbinegeluid bestaat uit drie herkenbare componenten, elk met een
+# ander frequentiebereik en draagwijdte:
+#  - hoorbaar geluid:        > 100-125 Hz
+#  - laagfrequent geluid (LFG): 20 - 100/125 Hz — reikt verder en dringt
+#    beter door in woningen dan hoger-frequent geluid.
+#  - infrasoon geluid:       < 20 Hz — bij windturbines doorgaans te zwak
+#    om waarneembaar te zijn, maar met een groot bereik.
+# Bron: "Notitie geluidsnorm windturbines Gelderland" (provincie Gelderland).
+# https://repository.officiele-overheidspublicaties.nl/externebijlagen/exb-2026-7801/1/bijlage/exb-2026-7801.PDF
+NOISE_SOUND_TYPES = [
+    {"naam": "Hoorbaar geluid", "bereik": "> 100-125 Hz"},
+    {"naam": "Laagfrequent geluid (LFG)", "bereik": "20 - 100/125 Hz"},
+    {"naam": "Infrasoon geluid", "bereik": "< 20 Hz"},
+]
+
+# Vaste beoordelingsafstanden. 5 km is opgenomen omdat laagfrequent geluid
+# (LFG) verder draagt dan hoger-frequent (hoorbaar) geluid.
+NOISE_DISTANCES_M = [500, 800, 1300, 2000, 5000]
 
 # Geluidskosten-aanname: gemiddelde jaarlijkse zorgkosten (huisarts/ziekenhuis
-# e.d.) per getroffen woning bij aantoonbare (ernstige) hinder, en de
-# beschouwingstermijn in jaren — beide expliciet door de gebruiker opgegeven.
-NOISE_COST_PER_HOUSE_PER_YEAR = 2000.0
+# e.d.) per getroffen PERSOON bij aantoonbare hinder, en de beschouwings-
+# termijn in jaren — beide expliciet door de gebruiker opgegeven. Het aantal
+# personen per getroffen woning wordt berekend met de CBS-gemiddelde
+# huishoudensgrootte van de betrokken buurt(en).
+NOISE_COST_PER_PERSON_PER_YEAR = 1500.0
 NOISE_COST_HORIZON_YEARS = 25
 
-# Hinderdrempels waarvoor het model apart het aantal getroffen woningen en de
-# bijbehorende kosten toont.
-NOISE_HINDER_THRESHOLDS_PCT = [10.0, 30.0]
+# Landelijk gemiddelde huishoudensgrootte (CBS), gebruikt als terugval-
+# waarde als een buurt geen (geldige) "gemiddeldeHuishoudsgrootte" heeft.
+NOISE_DEFAULT_HOUSEHOLD_SIZE = 2.1
 
-# TNO (2008) dosis-effectrelatie is gefit op Lden = 29-50 dB(A); buiten dat
-# bereik extrapoleert de kubische polynoom onbetrouwbaar. Onder de ondergrens
-# nemen we aan dat het hinderpercentage verwaarloosbaar is (0%); boven de
-# bovengrens knippen we de INVOERWAARDE af op 50 dB voor de polynoom, zodat
-# het model niet buiten het gevalideerde bereik extrapoleert.
-_TNO_LDEN_FIT_MIN = 29.0
-_TNO_LDEN_FIT_MAX = 50.0
+# Hinderdrempels waarvoor het model apart het aantal getroffen woningen en de
+# bijbehorende kosten toont. 10% en 30% zijn de door de gebruiker opgegeven
+# indicatieve aandelen; 46% is ontleend aan een peer-reviewed veldonderzoek
+# waarin 46% van de respondenten binnen 204-1.726 m van een windturbine het
+# geluid (bij 33-50 dB(A)) als hinderlijk of zeer hinderlijk beoordeelde.
+# Bron: Bakker et al., "Response to Noise Emitted by Wind Farms in People
+# Living in Their Neighborhood" (2018).
+# https://pmc.ncbi.nlm.nih.gov/articles/PMC6121431/
+NOISE_HINDER_THRESHOLDS_PCT = [10.0, 30.0, 46.0]
 
 
 def _propagation_level(lw: float, r: float) -> float:
@@ -82,31 +102,11 @@ def _propagation_level(lw: float, r: float) -> float:
     return lw - 20 * math.log10(r) - 9 - 0.005 * r
 
 
-def _pct_hinder_buiten(lden_proxy: float) -> float:
-    """% (algemeen) gehinderden, buitenwaarde, TNO 2008-D-R1051/B (Janssen,
-    Vos & Eisses), sectie 5.4, gefit op Lden 29-50 dB(A).
-    https://www.tno.nl/media/2187/hinder_door_geluid_van_windturbines.pdf
-    """
-    if lden_proxy < _TNO_LDEN_FIT_MIN:
-        return 0.0
-    l = min(lden_proxy, _TNO_LDEN_FIT_MAX)
-    pct = 34.25 - 0.864 * l - 0.0548 * l**2 + 0.001551 * l**3
-    return max(0.0, min(100.0, pct))
-
-
-def _pct_ernstige_hinder_buiten(lden_proxy: float) -> float:
-    """% ernstig gehinderden, buitenwaarde, TNO 2008-D-R1051/B, sectie 5.4."""
-    if lden_proxy < _TNO_LDEN_FIT_MIN:
-        return 0.0
-    l = min(lden_proxy, _TNO_LDEN_FIT_MAX)
-    pct = -97.94 + 9.627 * l - 0.3175 * l**2 + 0.003522 * l**3
-    return max(0.0, min(100.0, pct))
-
-
-def _houses_within_radius(turbines: list, radius_m: float) -> float:
+def _houses_and_household_size_within_radius(turbines: list, radius_m: float):
     """Telt (fractioneel, naar oppervlakte-aandeel) het aantal woningen dat
     ligt binnen de vereniging van cirkels met straal radius_m rond elke
-    turbine. Hergebruikt de CBS-buurt/WFS-infrastructuur van de
+    turbine, én de (woning-gewogen) gemiddelde CBS-huishoudensgrootte over
+    diezelfde buurten. Hergebruikt de CBS-buurt/WFS-infrastructuur van de
     waardedalingsmodule, maar dan als simpele schijf (geen effectbanden)."""
     from shapely.ops import unary_union
 
@@ -122,6 +122,8 @@ def _houses_within_radius(turbines: list, radius_m: float) -> float:
                 buurten_by_code[code] = feat
 
     total_houses = 0.0
+    hh_size_weighted_sum = 0.0
+    hh_size_weight = 0.0
     for feat in buurten_by_code.values():
         props = feat["properties"]
         wv = props.get("woningvoorraad")
@@ -139,48 +141,60 @@ def _houses_within_radius(turbines: list, radius_m: float) -> float:
         inter = union.intersection(geom)
         if inter.is_empty:
             continue
-        total_houses += wv * (inter.area / area)
-    return total_houses
+        houses_contrib = wv * (inter.area / area)
+        total_houses += houses_contrib
+        hh_size = props.get("gemiddeldeHuishoudsgrootte")
+        if hh_size is not None and hh_size > 0:
+            hh_size_weighted_sum += houses_contrib * hh_size
+            hh_size_weight += houses_contrib
+
+    avg_hh_size = (
+        hh_size_weighted_sum / hh_size_weight
+        if hh_size_weight > 0
+        else NOISE_DEFAULT_HOUSEHOLD_SIZE
+    )
+    return total_houses, avg_hh_size
 
 
 def calculate_noise(turbines: list) -> dict:
     """Bouwt de geluidshinder-tabel voor de vaste beoordelingsafstanden.
     dBA/dB zijn pure fysica (functie van R en het bronvermogen, onafhankelijk
-    van het aantal turbines); het aantal woningen binnen elke straal wordt
-    wél berekend op basis van de daadwerkelijk ingevoerde turbinelocatie(s)
-    (vereniging van cirkels, geen dubbeltelling bij overlap)."""
+    van het aantal turbines); het aantal woningen en de gemiddelde
+    huishoudensgrootte binnen elke straal worden wél berekend op basis van
+    de daadwerkelijk ingevoerde turbinelocatie(s) (vereniging van cirkels,
+    geen dubbeltelling bij overlap)."""
     if not turbines:
         raise ValueError("Geef minimaal één windturbinelocatie op.")
 
     rows = []
     for r in NOISE_DISTANCES_M:
-        houses = _houses_within_radius(turbines, r)
+        houses, avg_hh_size = _houses_and_household_size_within_radius(turbines, r)
         dba = _propagation_level(NOISE_LW_A, r)
         db_lin = _propagation_level(NOISE_LW_LIN, r)
-        pct_hinder = _pct_hinder_buiten(dba)
-        pct_ernstig = _pct_ernstige_hinder_buiten(dba)
 
         row = {
             "afstand_m": r,
             "aantal_woningen": round(houses, 1),
             "dba_7ms": round(dba, 1),
             "db_onweighted": round(db_lin, 1),
-            "pct_hinder": round(pct_hinder, 2),
-            "pct_ernstige_hinder": round(pct_ernstig, 2),
+            "personen_per_huishouden": round(avg_hh_size, 2),
             "drempels": [],
         }
         for threshold in NOISE_HINDER_THRESHOLDS_PCT:
             # Aantal getroffen woningen = het percentage van de woningen
             # binnen deze afstand dat de opgegeven hinderdrempel ervaart
-            # (bijv. 10% of 30% van de woningen op deze afstand), direct
-            # doorgerekend naar kosten per jaar en over de beschouwingstermijn.
+            # (bijv. 10%, 30% of 46% van de woningen op deze afstand).
+            # Kosten = getroffen woningen x gemiddeld aantal personen per
+            # huishouden x € 1.500/persoon/jaar, over 1 en over 25 jaar.
             n_houses = houses * (threshold / 100.0)
-            cost_year = n_houses * NOISE_COST_PER_HOUSE_PER_YEAR
+            n_personen = n_houses * avg_hh_size
+            cost_year = n_personen * NOISE_COST_PER_PERSON_PER_YEAR
             cost_horizon = cost_year * NOISE_COST_HORIZON_YEARS
             row["drempels"].append(
                 {
                     "drempel_pct": threshold,
                     "aantal_woningen": round(n_houses, 1),
+                    "aantal_personen": round(n_personen, 1),
                     "kosten_per_jaar_euro": round(cost_year),
                     "kosten_25jaar_euro": round(cost_horizon),
                 }
@@ -190,9 +204,10 @@ def calculate_noise(turbines: list) -> dict:
     return {
         "bronvermogen_dba": NOISE_LW_A,
         "bronvermogen_db": NOISE_LW_LIN,
-        "kosten_per_woning_per_jaar_euro": NOISE_COST_PER_HOUSE_PER_YEAR,
+        "kosten_per_persoon_per_jaar_euro": NOISE_COST_PER_PERSON_PER_YEAR,
         "kosten_horizon_jaar": NOISE_COST_HORIZON_YEARS,
         "drempels_pct": NOISE_HINDER_THRESHOLDS_PCT,
+        "geluidssoorten": NOISE_SOUND_TYPES,
         "rijen": rows,
     }
 
