@@ -222,8 +222,8 @@
               <th rowspan="2" class="num">dB (onweighted)</th>
               <th rowspan="2" class="num">% hinder</th>
               <th rowspan="2" class="num">% ernstige hinder</th>
-              <th colspan="3" class="num noise-group-th">≥ 10% hinder</th>
-              <th colspan="3" class="num noise-group-th">≥ 30% hinder</th>
+              <th colspan="3" class="num noise-group-th">10% hinder</th>
+              <th colspan="3" class="num noise-group-th">30% hinder</th>
             </tr>
             <tr>
               <th class="num">Woningen</th>
@@ -325,7 +325,7 @@
             <p>Het percentage (algemeen) gehinderden en ernstig gehinderden wordt berekend met de dosis-effectrelaties uit S.A. Janssen, H. Vos &amp; A.R. Eisses, <em>"Hinder door geluid van windturbines: Dosis-effectrelaties op basis van Nederlandse en Zweedse gegevens"</em>, TNO-rapport 2008-D-R1051/B (2008), sectie 5.4 — buitenwaarden, gebaseerd op gecombineerde Zweedse (2000, 2005) en Nederlandse (2007) enquêtedata:</p>
             <p style="font-size: var(--text-sm);">%hinder = 34,25 − 0,864·L − 0,0548·L² + 0,001551·L³<br/>%ernstige hinder = −97,94 + 9,627·L − 0,3175·L² + 0,003522·L³<br/><span style="color: var(--color-text-muted);">(L = geluidsniveau in dB(A), als benadering van L<sub>den</sub>)</span></p>
             <p>Bron: <a href="https://www.tno.nl/media/2187/hinder_door_geluid_van_windturbines.pdf" target="_blank" rel="noopener noreferrer">TNO-rapport 2008-D-R1051/B</a>. Deze formules zijn gefit op L<sub>den</sub> = 29–50 dB(A); het model gebruikt daarom het berekende dB(A)-niveau bij 7 m/s als benadering ("proxy") van L<sub>den</sub>. Dat is een vereenvoudiging — een exacte L<sub>den</sub> vereist de volledige jaarlijkse windsnelheidsverdeling op de locatie, conform de RIVM-rekenmethodiek. Onder 29 dB wordt het hinderpercentage op 0% gezet (buiten het gevalideerde bereik, verwaarloosbaar effect); boven 50 dB wordt de invoerwaarde voor de polynoom afgetopt op 50 dB om extrapolatiefouten te vermijden.</p>
-            <p>De kolommen "≥10% hinder" en "≥30% hinder" tonen, per afstand, alle woningen binnen die straal áls het berekende hinderpercentage op die afstand de drempel bereikt of overschrijdt (0 woningen als de drempel niet gehaald wordt). Omdat het geluidsniveau afneemt met de afstand, geldt: als de drempel op afstand R gehaald wordt, hebben ook alle dichterbij gelegen woningen (binnen R) minstens dat hinderniveau.</p>
+            <p>De kolommen "10% hinder" en "30% hinder" tonen, per afstand, het aantal woningen binnen die straal vermenigvuldigd met het betreffende percentage: aantal woningen binnen afstand R × 10% (resp. × 30%). Dit is een directe aanname over het aandeel woningen dat bij die afstand aantoonbare (resp. zwaardere) hinder ondervindt — geen drempeltoets op het berekende %hinder uit de TNO dosis-effectrelatie hierboven. De twee percentages worden op elke afstand onafhankelijk toegepast op het daar geldende woningaantal.</p>
             <p>De kosten per woning (€ 2.000 per jaar, oplopend tot € 2.000 × 25 = € 50.000 over 25 jaar) zijn een door de gebruiker opgegeven aanname voor gemiddelde jaarlijkse zorgkosten (huisarts, ziekenhuis e.d.) per getroffen woning bij aanhoudende geluidshinder. Dit is een vereenvoudigde, indicatieve aanname en geen resultaat van een gezondheidseconomische studie — gebruik deze kolom als eerste-orde inschatting, niet als exacte schadeclaim.</p>
           </div>
         </div>

@@ -170,14 +170,16 @@ def calculate_noise(turbines: list) -> dict:
             "drempels": [],
         }
         for threshold in NOISE_HINDER_THRESHOLDS_PCT:
-            triggered = pct_hinder >= threshold
-            n_houses = houses if triggered else 0.0
+            # Aantal getroffen woningen = het percentage van de woningen
+            # binnen deze afstand dat de opgegeven hinderdrempel ervaart
+            # (bijv. 10% of 30% van de woningen op deze afstand), direct
+            # doorgerekend naar kosten per jaar en over de beschouwingstermijn.
+            n_houses = houses * (threshold / 100.0)
             cost_year = n_houses * NOISE_COST_PER_HOUSE_PER_YEAR
             cost_horizon = cost_year * NOISE_COST_HORIZON_YEARS
             row["drempels"].append(
                 {
                     "drempel_pct": threshold,
-                    "bereikt": triggered,
                     "aantal_woningen": round(n_houses, 1),
                     "kosten_per_jaar_euro": round(cost_year),
                     "kosten_25jaar_euro": round(cost_horizon),
