@@ -66,12 +66,21 @@ NOISE_SOUND_TYPES = [
 # (LFG) verder draagt dan hoger-frequent (hoorbaar) geluid.
 NOISE_DISTANCES_M = [500, 800, 1300, 2000, 5000]
 
-# Geluidskosten-aanname: gemiddelde jaarlijkse zorgkosten (huisarts/ziekenhuis
-# e.d.) per getroffen PERSOON bij aantoonbare hinder, en de beschouwings-
-# termijn in jaren — beide expliciet door de gebruiker opgegeven. Het aantal
-# personen per getroffen woning wordt berekend met de CBS-gemiddelde
-# huishoudensgrootte van de betrokken buurt(en).
-NOISE_COST_PER_PERSON_PER_YEAR = 1500.0
+# Zorgkosten per getroffen PERSOON per jaar: evidence-based kerncijfer,
+# afgeleid van de dosis-responsrelatie tussen slaapstoornis en
+# windturbinegeluid uit Godono et al. (2023), Association between exposure
+# to wind turbines and sleep disorders: a systematic review and
+# meta-analysis, International Journal of Hygiene and Environmental
+# Health (15 studies, n=8.867). Voor elk van de vijf beoordelingsafstanden
+# (500/800/1.300/2.000/5.000 m) is de prevalentie van slaapstoornissen via
+# interpolatie bepaald en vertaald naar een licht/gemiddeld/zwaar
+# zorgtraject (NZa-tarieven + eigen risico), gemiddeld over de
+# midpoint- en bovengrens-kostenschatting; het kerncijfer is het
+# ongewogen gemiddelde van die vijf afstandsgemiddelden.
+# Bron: Positionpaper "Zorgkosten van gezondheidsklachten bij
+# windturbinehinder" (2026), hoofdstuk 6.
+# https://pubmed.ncbi.nlm.nih.gov/37844409/
+NOISE_COST_PER_PERSON_PER_YEAR = 609.60
 NOISE_COST_HORIZON_YEARS = 25
 
 # Landelijk gemiddelde huishoudensgrootte (CBS), gebruikt als terugval-
@@ -79,13 +88,25 @@ NOISE_COST_HORIZON_YEARS = 25
 NOISE_DEFAULT_HOUSEHOLD_SIZE = 2.1
 
 # Hinderdrempels waarvoor het model apart het aantal getroffen woningen en de
-# bijbehorende kosten toont. 10% en 30% zijn de door de gebruiker opgegeven
-# indicatieve aandelen; 46% is ontleend aan een peer-reviewed veldonderzoek
-# waarin 46% van de respondenten binnen 204-1.726 m van een windturbine het
-# geluid (bij 33-50 dB(A)) als hinderlijk of zeer hinderlijk beoordeelde.
-# Bron: Bakker et al., "Response to Noise Emitted by Wind Farms in People
-# Living in Their Neighborhood" (2018).
-# https://pmc.ncbi.nlm.nih.gov/articles/PMC6121431/
+# bijbehorende kosten toont, elk gebaseerd op een ander scenario:
+# - 10%: basisscenario. Het RIVM zelf meldt dat bij de Nederlandse
+#   geluidsnorm (47 dB Lden) ca. 8-9% van de bewoners binnenshuis ernstige
+#   hinder ondervindt (RIVM, Factsheet gezondheidseffecten van
+#   windturbinegeluid) — in dit model afgerond op 10% en gehanteerd als de
+#   door RIVM erkende basisaanname, analoog aan hoe de 4%-drempel in de
+#   waardedalingsmodule wordt gebruikt als de jurisprudentieel erkende
+#   grens voor eigen risico.
+#   https://www.rivm.nl/sites/default/files/2026-02/Factsheet-gezondheidseffecten-van-windturbinegeluid.pdf
+# - 30%: tussenscenario, indicatieve aanname door de gebruiker opgegeven.
+# - 46%: kritisch scenario, ontleend aan een peer-reviewed veldonderzoek
+#   waarin 46% van de respondenten binnen 204-1.726 m van een windturbine
+#   het geluid (bij 33-50 dB(A)) als hinderlijk of zeer hinderlijk
+#   beoordeelde. Bron: Pawlaczyk-Łuszczyńska, M., Zaborowski, K.,
+#   Dudarewicz, A., Zamojska-Daniszewska, M., Waszkowska, M. (2018),
+#   "Response to Noise Emitted by Wind Farms in People Living in Nearby
+#   Areas", International Journal of Environmental Research and Public
+#   Health, 15(8), 1575.
+#   https://pmc.ncbi.nlm.nih.gov/articles/PMC6121431/
 NOISE_HINDER_THRESHOLDS_PCT = [10.0, 30.0, 46.0]
 
 
@@ -185,7 +206,8 @@ def calculate_noise(turbines: list) -> dict:
             # binnen deze afstand dat de opgegeven hinderdrempel ervaart
             # (bijv. 10%, 30% of 46% van de woningen op deze afstand).
             # Kosten = getroffen woningen x gemiddeld aantal personen per
-            # huishouden x € 1.500/persoon/jaar, over 1 en over 25 jaar.
+            # huishouden x € 609,60/persoon/jaar (evidence-based zorgkosten-
+            # kerncijfer), over 1 en over 25 jaar.
             n_houses = houses * (threshold / 100.0)
             n_personen = n_houses * avg_hh_size
             cost_year = n_personen * NOISE_COST_PER_PERSON_PER_YEAR

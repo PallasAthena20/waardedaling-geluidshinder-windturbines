@@ -807,6 +807,15 @@ tfoot.results-total td {
   color: var(--color-primary);
   border-left: 2px solid var(--color-primary);
 }
+#noise-table thead th.noise-group-th .group-sub {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text-muted, var(--color-text-secondary));
+  margin-top: 2px;
+}
 
 .severity-chip {
   display: inline-flex;
