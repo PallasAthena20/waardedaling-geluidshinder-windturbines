@@ -707,6 +707,7 @@
         const noiseData = await noiseRes.json();
         if (!noiseRes.ok) throw new Error(noiseData.detail || 'Geluidsberekening mislukt');
         renderNoiseResults(noiseData);
+        renderDalyResults(noiseData);
       } catch (noiseErr) {
         console.error(noiseErr);
         showToast(noiseErr.message || 'Er ging iets mis bij de geluidsberekening.', true);
@@ -749,6 +750,32 @@
       })
       .join('');
     renderNoiseMapCircles();
+  }
+
+  const dalyTbody = document.getElementById('daly-tbody');
+  const dalyEmpty = document.getElementById('daly-empty');
+
+  function renderDalyResults(data) {
+    if (!dalyTbody) return;
+    if (dalyEmpty) dalyEmpty.style.display = 'none';
+    const rows = data.rijen || [];
+    dalyTbody.innerHTML = rows
+      .map((row) => {
+        const [t9, t30, t46] = row.drempels;
+        const cell = (d) => `
+          <td class="num">${fmtNum(d.aantal_personen, 1)}</td>
+          <td class="num">${fmtNum(d.daly.daly_totaal_jaar, 2)}</td>
+          <td class="num">${fmtEuro(d.daly.waarde_rivm_25jaar_euro)}</td>
+          <td class="num">${fmtEuro(d.daly.waarde_pbl_25jaar_euro)}</td>`;
+        return `
+      <tr>
+        <td class="num">${fmtDist(row.afstand_m)}</td>
+        ${cell(t9)}
+        ${cell(t30)}
+        ${cell(t46)}
+      </tr>`;
+      })
+      .join('');
   }
 
   function renderResults(data) {

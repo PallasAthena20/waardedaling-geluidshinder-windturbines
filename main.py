@@ -109,6 +109,50 @@ NOISE_DEFAULT_HOUSEHOLD_SIZE = 2.1
 #   https://pmc.ncbi.nlm.nih.gov/articles/PMC6121431/
 NOISE_HINDER_THRESHOLDS_PCT = [9.0, 30.0, 46.0]
 
+# ---------------------------------------------------------------------------
+# DALY-module (Disability-Adjusted Life Years)
+# ---------------------------------------------------------------------------
+# Bouwt voort op dezelfde vijf beoordelingsafstanden, dezelfde drie
+# hindernormen (9% / 30% / 46%) en hetzelfde aantal getroffen personen als de
+# geluidshinder-module hierboven. Rekent vervolgens de gezondheidslast van
+# ernstige slaapverstoring en ernstige hinder om in DALY's en monetariseert
+# die met twee bronnen. Methodologie en cijfers ontleend aan de positioning
+# paper "DALY-berekening geluidshinder windturbines" (2026).
+#
+# Disability weights (2024, meest recente empirisch gemeten WHO-waarden —
+# niet de oudere 2011- of 2018-cijfers, die resp. 0,07/0,03 en
+# 0,0175/0,01 bedroegen):
+#  - Slaapverstoring: DW 0,010 (95%-BI 0,006-0,015)
+#  - Ernstige hinder:  DW 0,011 (95%-BI 0,006-0,016)
+# Bron: WHO Regional Office for Europe (2024), "Disability weights for
+# noise-related health states in the WHO European Region", gebaseerd op
+# Charalampous et al. (2024), "Estimating disability weights for
+# environmental and non-environmental noise-related health states",
+# BMJ Public Health.
+# https://www.who.int/europe/publications/i/item/WHO-EURO-2024-9196-48968-72969
+# https://bmjpublichealth.bmj.com/content/2/1/e000470
+#
+# De DALY-last van hart- en vaatziekte en vroegtijdig overlijden (die
+# WHO/EEA ook aan omgevingsgeluid toeschrijven) wordt bewust NIET
+# meegerekend, omdat er geen windturbine-specifiek dosis-effectmodel voor
+# bestaat. De uitkomst van deze module is daarom een conservatieve
+# ondergrens, geen volledige gezondheidslast.
+DALY_DW_SLAAPVERSTORING = 0.010
+DALY_DW_ERNSTIGE_HINDER = 0.011
+
+# Waarde per DALY: twee overheidsbronnen, naast elkaar getoond (geen enkel
+# "juist" getal — het model toont beide scenario's).
+#  - RIVM (2025), conservatief basisscenario: € 50.000/DALY. Bron: RIVM,
+#    "Werken aan een gezonde leefomgeving met behulp van maatschappelijke
+#    kosten-batenanalyses (MKBA's)" (rekenvoorbeeld toxoplasmose).
+#    https://www.rivm.nl/sites/default/files/2025-02/Werken%20aan%20een%20gezonde%20leefomgeving%20met%20behulp%20van%20maatschappelijke%20kosten-batenanalyses%20(MKBA's).pdf
+#  - PBL (2012), milieubeleid (incl. windturbines): minimaal € 70.000/DALY,
+#    op basis van Viscusi & Aldy (2003). Bron: PBL, "Gezondheid in
+#    maatschappelijke kosten-batenanalyses van omgevingsbeleid".
+#    https://www.pbl.nl/sites/default/files/downloads/PBL_2012_Gezondheid_in_MKBAs_van_omgevingsbeleid_550051004.pdf
+DALY_VALUE_RIVM_EURO = 50_000
+DALY_VALUE_PBL_EURO = 70_000
+
 
 def _propagation_level(lw: float, r: float) -> float:
     """RIVM-vuistregel voor windturbinegeluid op afstand R (meter):
@@ -212,6 +256,18 @@ def calculate_noise(turbines: list) -> dict:
             n_personen = n_houses * avg_hh_size
             cost_year = n_personen * NOISE_COST_PER_PERSON_PER_YEAR
             cost_horizon = cost_year * NOISE_COST_HORIZON_YEARS
+
+            # DALY-module: dezelfde n_personen, omgezet in gezondheidslast.
+            # DALY/jaar = personen x (DW_slaapverstoring + DW_ernstige_hinder).
+            daly_slaap = n_personen * DALY_DW_SLAAPVERSTORING
+            daly_hinder = n_personen * DALY_DW_ERNSTIGE_HINDER
+            daly_totaal_jaar = daly_slaap + daly_hinder
+            daly_totaal_25jaar = daly_totaal_jaar * NOISE_COST_HORIZON_YEARS
+            daly_waarde_rivm_jaar = daly_totaal_jaar * DALY_VALUE_RIVM_EURO
+            daly_waarde_pbl_jaar = daly_totaal_jaar * DALY_VALUE_PBL_EURO
+            daly_waarde_rivm_25jaar = daly_waarde_rivm_jaar * NOISE_COST_HORIZON_YEARS
+            daly_waarde_pbl_25jaar = daly_waarde_pbl_jaar * NOISE_COST_HORIZON_YEARS
+
             row["drempels"].append(
                 {
                     "drempel_pct": threshold,
@@ -219,6 +275,16 @@ def calculate_noise(turbines: list) -> dict:
                     "aantal_personen": round(n_personen, 1),
                     "kosten_per_jaar_euro": round(cost_year),
                     "kosten_25jaar_euro": round(cost_horizon),
+                    "daly": {
+                        "daly_slaapverstoring_jaar": round(daly_slaap, 3),
+                        "daly_ernstige_hinder_jaar": round(daly_hinder, 3),
+                        "daly_totaal_jaar": round(daly_totaal_jaar, 3),
+                        "daly_totaal_25jaar": round(daly_totaal_25jaar, 2),
+                        "waarde_rivm_jaar_euro": round(daly_waarde_rivm_jaar),
+                        "waarde_pbl_jaar_euro": round(daly_waarde_pbl_jaar),
+                        "waarde_rivm_25jaar_euro": round(daly_waarde_rivm_25jaar),
+                        "waarde_pbl_25jaar_euro": round(daly_waarde_pbl_25jaar),
+                    },
                 }
             )
         rows.append(row)
@@ -230,6 +296,10 @@ def calculate_noise(turbines: list) -> dict:
         "kosten_horizon_jaar": NOISE_COST_HORIZON_YEARS,
         "drempels_pct": NOISE_HINDER_THRESHOLDS_PCT,
         "geluidssoorten": NOISE_SOUND_TYPES,
+        "daly_dw_slaapverstoring": DALY_DW_SLAAPVERSTORING,
+        "daly_dw_ernstige_hinder": DALY_DW_ERNSTIGE_HINDER,
+        "daly_waarde_rivm_euro": DALY_VALUE_RIVM_EURO,
+        "daly_waarde_pbl_euro": DALY_VALUE_PBL_EURO,
         "rijen": rows,
     }
 
