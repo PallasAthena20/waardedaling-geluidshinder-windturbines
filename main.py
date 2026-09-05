@@ -89,13 +89,13 @@ NOISE_DEFAULT_HOUSEHOLD_SIZE = 2.1
 
 # Hinderdrempels waarvoor het model apart het aantal getroffen woningen en de
 # bijbehorende kosten toont, elk gebaseerd op een ander scenario:
-# - 10%: basisscenario. Het RIVM zelf meldt dat bij de Nederlandse
+# - 9%: basisscenario. Het RIVM meldt zelf dat bij de Nederlandse
 #   geluidsnorm (47 dB Lden) ca. 8-9% van de bewoners binnenshuis ernstige
 #   hinder ondervindt (RIVM, Factsheet gezondheidseffecten van
-#   windturbinegeluid) — in dit model afgerond op 10% en gehanteerd als de
-#   door RIVM erkende basisaanname, analoog aan hoe de 4%-drempel in de
-#   waardedalingsmodule wordt gebruikt als de jurisprudentieel erkende
-#   grens voor eigen risico.
+#   windturbinegeluid) — dit model gebruikt het exacte, niet-afgeronde
+#   RIVM-cijfer van 9% als door RIVM erkende basisaanname, analoog aan hoe
+#   de 4%-drempel in de waardedalingsmodule wordt gebruikt als de
+#   jurisprudentieel erkende grens voor eigen risico.
 #   https://www.rivm.nl/sites/default/files/2026-02/Factsheet-gezondheidseffecten-van-windturbinegeluid.pdf
 # - 30%: tussenscenario, indicatieve aanname door de gebruiker opgegeven.
 # - 46%: kritisch scenario, ontleend aan een peer-reviewed veldonderzoek
@@ -107,7 +107,7 @@ NOISE_DEFAULT_HOUSEHOLD_SIZE = 2.1
 #   Areas", International Journal of Environmental Research and Public
 #   Health, 15(8), 1575.
 #   https://pmc.ncbi.nlm.nih.gov/articles/PMC6121431/
-NOISE_HINDER_THRESHOLDS_PCT = [10.0, 30.0, 46.0]
+NOISE_HINDER_THRESHOLDS_PCT = [9.0, 30.0, 46.0]
 
 
 def _propagation_level(lw: float, r: float) -> float:
@@ -204,7 +204,7 @@ def calculate_noise(turbines: list) -> dict:
         for threshold in NOISE_HINDER_THRESHOLDS_PCT:
             # Aantal getroffen woningen = het percentage van de woningen
             # binnen deze afstand dat de opgegeven hinderdrempel ervaart
-            # (bijv. 10%, 30% of 46% van de woningen op deze afstand).
+            # (bijv. 9%, 30% of 46% van de woningen op deze afstand).
             # Kosten = getroffen woningen x gemiddeld aantal personen per
             # huishouden x € 609,60/persoon/jaar (evidence-based zorgkosten-
             # kerncijfer), over 1 en over 25 jaar.
