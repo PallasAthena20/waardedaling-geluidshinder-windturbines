@@ -275,6 +275,45 @@
   let turbines = []; // { id, label, lat, lon, category, method }
   let idCounter = 1;
 
+  /* ---------------------------------------------------------------------
+     Windroos + overheersende windrichting (zuidwest, KNMI-klimatologie)
+     De meest voorkomende windrichting in Nederland is zuidwest. Bij elke
+     geplaatste turbine wordt dit getoond met een pijl door de turbine-
+     locatie: de staart wijst naar het zuidwesten (waar de wind vandaan
+     komt), de punt naar het noordoosten (waar de wind naartoe waait).
+     --------------------------------------------------------------------- */
+  const PREVAILING_WIND_BEARING_DEG = 45; // kompasrichting NO = wind uit het ZW
+
+  function createCompassRoseEl() {
+    const el = document.createElement('div');
+    el.className = 'compass-rose';
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = `
+      <svg viewBox="0 0 64 64" width="60" height="60">
+        <circle cx="32" cy="32" r="29" fill="rgba(255,255,255,0.92)" stroke="#0d6f66" stroke-width="1.3"/>
+        <path d="M32 6 L36.5 32 L32 58 L27.5 32 Z" fill="#0d6f66"/>
+        <path d="M6 32 L32 27.5 L58 32 L32 36.5 Z" fill="#0d6f66" opacity="0.32"/>
+        <circle cx="32" cy="32" r="2.4" fill="#0d6f66"/>
+        <text x="32" y="15" text-anchor="middle" font-size="10" font-weight="700" fill="#0d6f66" font-family="sans-serif">N</text>
+        <text x="32" y="54.5" text-anchor="middle" font-size="8.5" fill="#5b6b73" font-family="sans-serif">Z</text>
+        <text x="9.5" y="35.5" text-anchor="middle" font-size="8.5" fill="#5b6b73" font-family="sans-serif">W</text>
+        <text x="54.5" y="35.5" text-anchor="middle" font-size="8.5" fill="#5b6b73" font-family="sans-serif">O</text>
+      </svg>`;
+    return el;
+  }
+
+  function createWindArrowEl() {
+    const el = document.createElement('div');
+    el.className = 'wind-arrow';
+    el.title = 'Overheersende windrichting in Nederland: zuidwest (bron: KNMI-klimatologie).';
+    el.innerHTML = `
+      <svg viewBox="0 0 40 110" width="26" height="72">
+        <line x1="20" y1="100" x2="20" y2="18" stroke="#c8553d" stroke-width="4.5" stroke-linecap="round"/>
+        <path d="M20 4 L31 22 L9 22 Z" fill="#c8553d"/>
+      </svg>`;
+    return el;
+  }
+
   const map = new maplibregl.Map({
     container: 'map',
     style: 'https://tiles.openfreemap.org/styles/positron',
@@ -282,6 +321,7 @@
     zoom: 6.4,
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+  map.getContainer().appendChild(createCompassRoseEl());
 
   let mapReady = false;
   map.on('load', () => {
@@ -373,8 +413,28 @@
       });
     });
     map.getSource('influence-circles') && map.getSource('influence-circles').setData({ type: 'FeatureCollection', features: features.filter((f) => f.geometry.type !== 'Point') });
+    updateWindMarkers();
     updateMarkers();
     fitMapToTurbines();
+  }
+
+  let windMarkerEls = [];
+  function updateWindMarkers() {
+    windMarkerEls.forEach((m) => m.remove());
+    windMarkerEls = [];
+    turbines.forEach((t) => {
+      const el = createWindArrowEl();
+      const marker = new maplibregl.Marker({
+        element: el,
+        anchor: 'center',
+        rotation: PREVAILING_WIND_BEARING_DEG,
+        rotationAlignment: 'map',
+        pitchAlignment: 'map',
+      })
+        .setLngLat([t.lon, t.lat])
+        .addTo(map);
+      windMarkerEls.push(marker);
+    });
   }
 
   let markerEls = [];
@@ -426,6 +486,7 @@
     zoom: 6.4,
   });
   noiseMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+  noiseMap.getContainer().appendChild(createCompassRoseEl());
 
   let noiseMapReady = false;
   noiseMap.on('load', () => {
@@ -459,9 +520,11 @@
   function renderNoiseMapLegend() {
     const legendEl = document.getElementById('noise-map-legend');
     if (!legendEl) return;
-    legendEl.innerHTML = NOISE_MAP_DISTANCES_M.map(
-      (d, i) => `<span class="lg-item"><span class="swatch" style="background:${NOISE_MAP_COLORS[i]}"></span>${fmtDist(d)}</span>`
-    ).join('');
+    legendEl.innerHTML =
+      NOISE_MAP_DISTANCES_M.map(
+        (d, i) => `<span class="lg-item"><span class="swatch" style="background:${NOISE_MAP_COLORS[i]}"></span>${fmtDist(d)}</span>`
+      ).join('') +
+      `<span class="lg-item"><span class="wind-swatch"></span>Overheersende windrichting zuidwest (bron: KNMI)</span>`;
   }
 
   function renderNoiseMapCircles() {
@@ -482,6 +545,7 @@
     });
     noiseMap.getSource('noise-circles') && noiseMap.getSource('noise-circles').setData({ type: 'FeatureCollection', features: circleFeatures });
     noiseMap.getSource('noise-markers') && noiseMap.getSource('noise-markers').setData({ type: 'FeatureCollection', features: markerFeatures });
+    updateNoiseWindMarkers();
     if (turbines.length === 1) {
       noiseMap.flyTo({ center: [turbines[0].lon, turbines[0].lat], zoom: 10.5 });
     } else if (turbines.length > 1) {
@@ -489,6 +553,25 @@
       turbines.forEach((t) => bounds.extend([t.lon, t.lat]));
       noiseMap.fitBounds(bounds, { padding: 80, maxZoom: 11 });
     }
+  }
+
+  let noiseWindMarkerEls = [];
+  function updateNoiseWindMarkers() {
+    noiseWindMarkerEls.forEach((m) => m.remove());
+    noiseWindMarkerEls = [];
+    turbines.forEach((t) => {
+      const el = createWindArrowEl();
+      const marker = new maplibregl.Marker({
+        element: el,
+        anchor: 'center',
+        rotation: PREVAILING_WIND_BEARING_DEG,
+        rotationAlignment: 'map',
+        pitchAlignment: 'map',
+      })
+        .setLngLat([t.lon, t.lat])
+        .addTo(noiseMap);
+      noiseWindMarkerEls.push(marker);
+    });
   }
 
   /* ---------------------------------------------------------------------
