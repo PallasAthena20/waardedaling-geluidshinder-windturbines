@@ -912,6 +912,207 @@
     a.remove();
   });
 
+  /* ---------------------------------------------------------------------
+     Module 4 - Investeringskosten-module (bouw-/investeringskosten)
+     --------------------------------------------------------------------- */
+  const fmtEuroDec = (n) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n || 0);
+
+  let investGroups = []; // { id, label, vermogen_mw, aantal, hoofdcategorie, windcategorie }
+  let investIdCounter = 1;
+  let lastInvestResult = null;
+
+  const investGroupListEl = document.getElementById('invest-group-list');
+  const investEmptyStateEl = document.getElementById('invest-empty-state');
+  const investAddBtn = document.getElementById('invest-add-btn');
+  const investCalculateBtn = document.getElementById('invest-calculate-btn');
+  const investLabelInput = document.getElementById('invest-label');
+  const investMwInput = document.getElementById('invest-mw');
+  const investAantalInput = document.getElementById('invest-aantal');
+  const investCategorySelect = document.getElementById('invest-category-select');
+  const investWindcategorySelect = document.getElementById('invest-windcategory-select');
+  const investKpiGrid = document.getElementById('invest-kpi-grid');
+  const investTbody = document.getElementById('invest-tbody');
+  const investTotalRow = document.getElementById('invest-total-row');
+  const investEmptyResultsEl = document.getElementById('invest-empty-results');
+
+  const INVEST_CATEGORY_LABELS = {
+    regulier: 'Wind op land, regulier',
+    hoogtebeperkt: 'Wind op land, hoogtebeperkt',
+    waterkeringen: 'Wind op waterkeringen',
+  };
+
+  function parseDecimal(str) {
+    if (!str) return NaN;
+    return parseFloat(String(str).replace(',', '.').trim());
+  }
+
+  function renderInvestGroupList() {
+    investGroupListEl.innerHTML = '';
+    investEmptyStateEl.style.display = investGroups.length ? 'none' : '';
+    investCalculateBtn.disabled = investGroups.length === 0;
+    investGroups.forEach((g, i) => {
+      const row = document.createElement('div');
+      row.className = 'turbine-item';
+      row.innerHTML = `
+        <div class="turbine-badge">${i + 1}</div>
+        <div class="turbine-info">
+          <div class="name">${escapeHtml(g.label)}</div>
+          <div class="meta">${g.aantal} \u00d7 ${fmtNum(g.vermogen_mw, 2)} MW \u00b7 ${escapeHtml(INVEST_CATEGORY_LABELS[g.hoofdcategorie] || g.hoofdcategorie)} \u00b7 windcat. ${escapeHtml(g.windcategorie)}</div>
+        </div>
+      `;
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'btn btn-ghost';
+      removeBtn.type = 'button';
+      removeBtn.setAttribute('aria-label', 'Verwijder turbinegroep ' + (i + 1));
+      removeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
+      removeBtn.addEventListener('click', () => {
+        investGroups = investGroups.filter((x) => x.id !== g.id);
+        renderInvestGroupList();
+        hideInvestResults();
+      });
+      row.appendChild(removeBtn);
+      investGroupListEl.appendChild(row);
+    });
+  }
+
+  function hideInvestResults() {
+    investKpiGrid.innerHTML = '';
+    investTbody.innerHTML = '';
+    investTotalRow.innerHTML = '';
+    investEmptyResultsEl.style.display = '';
+    lastInvestResult = null;
+  }
+
+  investAddBtn.addEventListener('click', () => {
+    const vermogenMw = parseDecimal(investMwInput.value);
+    const aantal = parseInt(investAantalInput.value, 10);
+    if (!vermogenMw || vermogenMw <= 0) {
+      showToast('Vul een geldig vermogen per turbine in (MW).', true);
+      investMwInput.focus();
+      return;
+    }
+    if (!aantal || aantal <= 0) {
+      showToast('Vul een geldig aantal turbines in.', true);
+      investAantalInput.focus();
+      return;
+    }
+    investGroups.push({
+      id: investIdCounter++,
+      label: investLabelInput.value.trim() || `Turbinegroep ${investGroups.length + 1}`,
+      vermogen_mw: vermogenMw,
+      aantal,
+      hoofdcategorie: investCategorySelect.value,
+      windcategorie: investWindcategorySelect.value,
+    });
+    renderInvestGroupList();
+    hideInvestResults();
+    investLabelInput.value = '';
+    investMwInput.value = '';
+    investAantalInput.value = '';
+    showToast('Turbinegroep toegevoegd.');
+  });
+
+  function renderInvestResults(data) {
+    const t = data.totalen;
+    investKpiGrid.innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-label">Totaal vermogen</div>
+        <div class="kpi-value">${fmtNum(t.vermogen_totaal_mw, 1)} MW</div>
+        <div class="kpi-sub">${fmtNum(t.aantal_turbines_totaal, 0)} turbine(s)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Turbineprijs totaal</div>
+        <div class="kpi-value">${fmtEuro(t.turbineprijs_totaal_euro)}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Totale investeringskosten</div>
+        <div class="kpi-value">${fmtEuro(t.investering_totaal_euro)}</div>
+        <div class="kpi-sub">waarvan ${fmtEuro(t.meerkosten_totaal_euro)} meerkosten</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Gem. kosten per MWh (20 jaar)</div>
+        <div class="kpi-value">${fmtEuroDec(t.gem_kosten_per_mwh_levensduur_euro)}</div>
+        <div class="kpi-sub">${fmtEuroDec(t.gem_kosten_per_mwh_jaar1_euro)} per MWh in jaar 1</div>
+      </div>
+    `;
+
+    investTbody.innerHTML = data.rijen
+      .map(
+        (r) => `
+      <tr>
+        <td>${escapeHtml(r.label)}</td>
+        <td>${escapeHtml(r.hoofdcategorie_label)}</td>
+        <td class="num">${escapeHtml(r.windcategorie)}</td>
+        <td class="num">${fmtNum(r.vermogen_per_turbine_mw, 2)} MW</td>
+        <td class="num">${fmtNum(r.aantal_turbines, 0)}</td>
+        <td class="num">${fmtNum(r.vermogen_totaal_mw, 2)} MW</td>
+        <td class="num">${fmtEuro(r.turbineprijs_per_kw_euro)}</td>
+        <td class="num">${fmtEuro(r.investering_per_kw_euro)}</td>
+        <td class="num">${fmtEuro(r.turbineprijs_per_turbine_euro)}</td>
+        <td class="num">${fmtEuro(r.investering_per_turbine_euro)}</td>
+        <td class="num">${fmtEuro(r.investering_totaal_euro)}</td>
+        <td class="num">${fmtNum(r.vollasturen, 0)}</td>
+        <td class="num">${fmtNum(r.jaarproductie_mwh, 0)}</td>
+        <td class="num">${fmtEuroDec(r.kosten_per_mwh_jaar1_euro)}</td>
+        <td class="num">${fmtEuroDec(r.kosten_per_mwh_levensduur_euro)}</td>
+      </tr>`
+      )
+      .join('');
+
+    investTotalRow.innerHTML = `
+      <td><strong>Totaal</strong></td>
+      <td></td>
+      <td></td>
+      <td></td>
+      <td class="num">${fmtNum(t.aantal_turbines_totaal, 0)}</td>
+      <td class="num">${fmtNum(t.vermogen_totaal_mw, 2)} MW</td>
+      <td></td>
+      <td></td>
+      <td class="num">${fmtEuro(t.turbineprijs_totaal_euro)}</td>
+      <td></td>
+      <td class="num">${fmtEuro(t.investering_totaal_euro)}</td>
+      <td></td>
+      <td class="num">${fmtNum(t.jaarproductie_mwh, 0)}</td>
+      <td class="num">${fmtEuroDec(t.gem_kosten_per_mwh_jaar1_euro)}</td>
+      <td class="num">${fmtEuroDec(t.gem_kosten_per_mwh_levensduur_euro)}</td>
+    `;
+
+    investEmptyResultsEl.style.display = 'none';
+  }
+
+  investCalculateBtn.addEventListener('click', async () => {
+    investCalculateBtn.disabled = true;
+    investCalculateBtn.innerHTML = '<span class="spinner"></span> Berekenen\u2026';
+    try {
+      const res = await fetch(`${API}/api/calculate-investment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          groepen: investGroups.map((g) => ({
+            label: g.label,
+            vermogen_mw: g.vermogen_mw,
+            aantal: g.aantal,
+            hoofdcategorie: g.hoofdcategorie,
+            windcategorie: g.windcategorie,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Berekening mislukt');
+      lastInvestResult = data;
+      renderInvestResults(data);
+      showToast('Berekening voltooid.');
+    } catch (e) {
+      console.error(e);
+      showToast(e.message || 'Er ging iets mis bij het berekenen.', true);
+    } finally {
+      investCalculateBtn.disabled = false;
+      investCalculateBtn.textContent = 'Berekenen';
+    }
+  });
+
+  renderInvestGroupList();
+
   loadCategories();
   renderTurbineList();
 })();

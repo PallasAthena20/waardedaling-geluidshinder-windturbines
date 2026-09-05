@@ -632,6 +632,175 @@ def calculate(turbines: list):
 
 
 # ---------------------------------------------------------------------------
+# Module 4: bouw-/investeringskosten per turbine
+# Bron: PBL (2026), "Advies basisbedragen SDE++ 2026" (eindadvies), hoofdstuk 7
+# Windenergie op land. https://www.pbl.nl/publicaties/advies-basisbedragen-sde-2026
+# ---------------------------------------------------------------------------
+
+# Generieke turbineprijs (incl. transport/installatie van de turbine zelf,
+# excl. overige projectkosten), ongewijzigd t.o.v. 2025 - par. 7.2.1 / Tabel 7.5.
+INVEST_TURBINE_PRICE_PER_KW = 1090.0
+
+# Totale investeringskosten per kW (turbineprijs + meerkosten: netaansluiting,
+# funderingen, bekabeling, wegen, voorbereidingskosten e.d.) per hoofdcategorie.
+INVEST_TOTAL_PER_KW = {
+    "regulier": 1540.0,       # Tabel 7.5 - Wind op land, regulier (2025: 1.430)
+    "hoogtebeperkt": 1550.0,  # Tabel 7.7 - Wind op land, hoogtebeperkt max. 150 m tiphoogte (2025: 1.370)
+    "waterkeringen": 1770.0,  # Tabel 7.9 - Wind op waterkeringen (2025: 1.665)
+}
+
+INVEST_CATEGORY_LABELS = {
+    "regulier": "Wind op land, regulier",
+    "hoogtebeperkt": "Wind op land, met hoogtebeperking (max. 150 m tiphoogte)",
+    "waterkeringen": "Wind op waterkeringen",
+}
+
+# Tabel 7.4 - vollasturen per jaar, per windsnelheidscategorie (I t/m V) en
+# hoofdcategorie. Bepaalt samen met het windparkverlies de jaarproductie.
+INVEST_VOLLASTUREN = {
+    "I":   {"regulier": 3660, "hoogtebeperkt": 3040, "waterkeringen": 3680},
+    "II":  {"regulier": 3290, "hoogtebeperkt": 2690, "waterkeringen": 3300},
+    "III": {"regulier": 2980, "hoogtebeperkt": 2390, "waterkeringen": 3000},
+    "IV":  {"regulier": 2780, "hoogtebeperkt": 2210, "waterkeringen": 2800},
+    "V":   {"regulier": 2580, "hoogtebeperkt": 2020, "waterkeringen": 2590},
+}
+
+INVEST_WINDSPEED_LABELS = {
+    "I": "\u2265 8,0 m/s",
+    "II": "7,5 - 8,0 m/s",
+    "III": "7,0 - 7,5 m/s",
+    "IV": "6,75 - 7,0 m/s",
+    "V": "< 6,75 m/s",
+}
+
+INVEST_WINDPARKVERLIES_PCT = 13.0  # par. 7.2.2 - zog-, elektrische en overige verliezen
+INVEST_ECONOMISCHE_LEVENSDUUR_JAAR = 20  # par. 6.6 / 7.1.4 - economische levensduur windenergie op land
+
+
+@dataclass
+class TurbineGroep:
+    label: str
+    vermogen_mw: float  # vermogen per turbine, in MW
+    aantal: int         # aantal turbines in deze groep
+    hoofdcategorie: str  # "regulier" | "hoogtebeperkt" | "waterkeringen"
+    windcategorie: str   # "I" .. "V"
+
+
+def calculate_investment(groepen: list):
+    if not groepen:
+        raise ValueError("Geef minimaal \u00e9\u00e9n turbinegroep op.")
+
+    rijen = []
+    tot_turbineprijs = 0.0
+    tot_investering = 0.0
+    tot_vermogen_mw = 0.0
+    tot_turbines = 0
+    tot_jaarproductie_mwh = 0.0
+    tot_levensduurproductie_mwh = 0.0
+
+    for g in groepen:
+        if g.hoofdcategorie not in INVEST_TOTAL_PER_KW:
+            raise ValueError(f"Onbekende categorie: {g.hoofdcategorie}")
+        if g.windcategorie not in INVEST_VOLLASTUREN:
+            raise ValueError(f"Onbekende windsnelheidscategorie: {g.windcategorie}")
+        if g.vermogen_mw <= 0 or g.aantal <= 0:
+            raise ValueError("Vermogen en aantal turbines moeten groter dan 0 zijn.")
+
+        vermogen_totaal_kw = g.vermogen_mw * 1000.0 * g.aantal
+        turbineprijs_totaal = vermogen_totaal_kw * INVEST_TURBINE_PRICE_PER_KW
+        investering_totaal = vermogen_totaal_kw * INVEST_TOTAL_PER_KW[g.hoofdcategorie]
+        meerkosten_totaal = investering_totaal - turbineprijs_totaal
+
+        vollasturen = INVEST_VOLLASTUREN[g.windcategorie][g.hoofdcategorie]
+        jaarproductie_mwh = (
+            (vermogen_totaal_kw / 1000.0)
+            * vollasturen
+            * (1 - INVEST_WINDPARKVERLIES_PCT / 100.0)
+        )
+        levensduurproductie_mwh = jaarproductie_mwh * INVEST_ECONOMISCHE_LEVENSDUUR_JAAR
+
+        kosten_per_mwh_jaar1 = (
+            investering_totaal / jaarproductie_mwh if jaarproductie_mwh > 0 else 0.0
+        )
+        kosten_per_mwh_levensduur = (
+            investering_totaal / levensduurproductie_mwh
+            if levensduurproductie_mwh > 0
+            else 0.0
+        )
+
+        rijen.append(
+            {
+                "label": g.label,
+                "hoofdcategorie": g.hoofdcategorie,
+                "hoofdcategorie_label": INVEST_CATEGORY_LABELS[g.hoofdcategorie],
+                "windcategorie": g.windcategorie,
+                "windcategorie_label": INVEST_WINDSPEED_LABELS[g.windcategorie],
+                "vermogen_per_turbine_mw": g.vermogen_mw,
+                "aantal_turbines": g.aantal,
+                "vermogen_totaal_mw": round(vermogen_totaal_kw / 1000.0, 3),
+                "turbineprijs_per_kw_euro": INVEST_TURBINE_PRICE_PER_KW,
+                "investering_per_kw_euro": INVEST_TOTAL_PER_KW[g.hoofdcategorie],
+                "meerkosten_per_kw_euro": round(
+                    INVEST_TOTAL_PER_KW[g.hoofdcategorie] - INVEST_TURBINE_PRICE_PER_KW, 1
+                ),
+                "turbineprijs_per_mw_euro": round(INVEST_TURBINE_PRICE_PER_KW * 1000),
+                "investering_per_mw_euro": round(INVEST_TOTAL_PER_KW[g.hoofdcategorie] * 1000),
+                "turbineprijs_per_turbine_euro": round(turbineprijs_totaal / g.aantal),
+                "investering_per_turbine_euro": round(investering_totaal / g.aantal),
+                "turbineprijs_totaal_euro": round(turbineprijs_totaal),
+                "meerkosten_totaal_euro": round(meerkosten_totaal),
+                "investering_totaal_euro": round(investering_totaal),
+                "vollasturen": vollasturen,
+                "windparkverlies_pct": INVEST_WINDPARKVERLIES_PCT,
+                "jaarproductie_mwh": round(jaarproductie_mwh, 1),
+                "levensduur_jaar": INVEST_ECONOMISCHE_LEVENSDUUR_JAAR,
+                "levensduurproductie_mwh": round(levensduurproductie_mwh, 1),
+                "kosten_per_mwh_jaar1_euro": round(kosten_per_mwh_jaar1, 2),
+                "kosten_per_mwh_levensduur_euro": round(kosten_per_mwh_levensduur, 2),
+            }
+        )
+
+        tot_turbineprijs += turbineprijs_totaal
+        tot_investering += investering_totaal
+        tot_vermogen_mw += vermogen_totaal_kw / 1000.0
+        tot_turbines += g.aantal
+        tot_jaarproductie_mwh += jaarproductie_mwh
+        tot_levensduurproductie_mwh += levensduurproductie_mwh
+
+    totalen = {
+        "vermogen_totaal_mw": round(tot_vermogen_mw, 3),
+        "aantal_turbines_totaal": tot_turbines,
+        "turbineprijs_totaal_euro": round(tot_turbineprijs),
+        "meerkosten_totaal_euro": round(tot_investering - tot_turbineprijs),
+        "investering_totaal_euro": round(tot_investering),
+        "jaarproductie_mwh": round(tot_jaarproductie_mwh, 1),
+        "levensduurproductie_mwh": round(tot_levensduurproductie_mwh, 1),
+        "gem_kosten_per_mwh_jaar1_euro": round(
+            tot_investering / tot_jaarproductie_mwh, 2
+        )
+        if tot_jaarproductie_mwh > 0
+        else 0,
+        "gem_kosten_per_mwh_levensduur_euro": round(
+            tot_investering / tot_levensduurproductie_mwh, 2
+        )
+        if tot_levensduurproductie_mwh > 0
+        else 0,
+    }
+
+    return {
+        "turbineprijs_per_kw_euro": INVEST_TURBINE_PRICE_PER_KW,
+        "investering_per_kw": INVEST_TOTAL_PER_KW,
+        "categorie_labels": INVEST_CATEGORY_LABELS,
+        "windcategorie_labels": INVEST_WINDSPEED_LABELS,
+        "vollasturen": INVEST_VOLLASTUREN,
+        "windparkverlies_pct": INVEST_WINDPARKVERLIES_PCT,
+        "levensduur_jaar": INVEST_ECONOMISCHE_LEVENSDUUR_JAAR,
+        "rijen": rijen,
+        "totalen": totalen,
+    }
+
+
+# ---------------------------------------------------------------------------
 # FastAPI app (Vercel Python runtime detects the ASGI `app` object)
 # ---------------------------------------------------------------------------
 
@@ -659,6 +828,18 @@ class TurbineIn(BaseModel):
 
 class CalcIn(BaseModel):
     turbines: list[TurbineIn]
+
+
+class TurbineGroepIn(BaseModel):
+    label: str = Field(default="Turbinegroep", max_length=120)
+    vermogen_mw: float = Field(gt=0, le=30)
+    aantal: int = Field(gt=0, le=500)
+    hoofdcategorie: str
+    windcategorie: str
+
+
+class InvestmentIn(BaseModel):
+    groepen: list[TurbineGroepIn]
 
 
 @app.get("/api/health")
@@ -749,6 +930,42 @@ def api_calculate_noise(payload: CalcIn):
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=422, detail=f"Geluidsberekening mislukt: {e}")
+
+
+@app.get("/api/investment-constants")
+def investment_constants():
+    return {
+        "turbineprijs_per_kw_euro": INVEST_TURBINE_PRICE_PER_KW,
+        "investering_per_kw": INVEST_TOTAL_PER_KW,
+        "categorie_labels": INVEST_CATEGORY_LABELS,
+        "windcategorie_labels": INVEST_WINDSPEED_LABELS,
+        "vollasturen": INVEST_VOLLASTUREN,
+        "windparkverlies_pct": INVEST_WINDPARKVERLIES_PCT,
+        "levensduur_jaar": INVEST_ECONOMISCHE_LEVENSDUUR_JAAR,
+    }
+
+
+@app.post("/api/calculate-investment")
+def api_calculate_investment(payload: InvestmentIn):
+    try:
+        groepen = [
+            TurbineGroep(
+                label=g.label or "Turbinegroep",
+                vermogen_mw=g.vermogen_mw,
+                aantal=g.aantal,
+                hoofdcategorie=g.hoofdcategorie,
+                windcategorie=g.windcategorie,
+            )
+            for g in payload.groepen
+        ]
+        return calculate_investment(groepen)
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=422, detail=f"Berekening mislukt: {e}")
 
 
 @app.get("/api/export/csv")
