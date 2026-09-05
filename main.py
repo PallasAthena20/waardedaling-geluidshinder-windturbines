@@ -150,8 +150,16 @@ DALY_DW_ERNSTIGE_HINDER = 0.011
 #    op basis van Viscusi & Aldy (2003). Bron: PBL, "Gezondheid in
 #    maatschappelijke kosten-batenanalyses van omgevingsbeleid".
 #    https://www.pbl.nl/sites/default/files/downloads/PBL_2012_Gezondheid_in_MKBAs_van_omgevingsbeleid_550051004.pdf
+#  - Zorginstituut Nederland (2024), referentiewaarde zorg: € 80.000/DALY,
+#    afgeleid via de QALY-DALY-spiegelrelatie (PBL/Gezondheidsraad) uit de
+#    kosteneffectiviteitsdrempel van € 80.000/QALY. Dit is ook de waarde
+#    waarmee de positioning paper zelf in haar conclusie afsluit. Bron:
+#    Zorginstituut Nederland, "Beoordelingskader kosteneffectiviteit van
+#    zorg" (2024).
+#    https://www.zorginstituutnederland.nl/site/binaries/site-content/collections/documents/2024/11/26/beoordelingskader-kosteneffectiviteit-van-zorg/Beoordelingskader+kosteneffectiviteit+van+zorg.pdf
 DALY_VALUE_RIVM_EURO = 50_000
 DALY_VALUE_PBL_EURO = 70_000
+DALY_VALUE_ZIN_EURO = 80_000
 
 
 def _propagation_level(lw: float, r: float) -> float:
@@ -265,8 +273,10 @@ def calculate_noise(turbines: list) -> dict:
             daly_totaal_25jaar = daly_totaal_jaar * NOISE_COST_HORIZON_YEARS
             daly_waarde_rivm_jaar = daly_totaal_jaar * DALY_VALUE_RIVM_EURO
             daly_waarde_pbl_jaar = daly_totaal_jaar * DALY_VALUE_PBL_EURO
+            daly_waarde_zin_jaar = daly_totaal_jaar * DALY_VALUE_ZIN_EURO
             daly_waarde_rivm_25jaar = daly_waarde_rivm_jaar * NOISE_COST_HORIZON_YEARS
             daly_waarde_pbl_25jaar = daly_waarde_pbl_jaar * NOISE_COST_HORIZON_YEARS
+            daly_waarde_zin_25jaar = daly_waarde_zin_jaar * NOISE_COST_HORIZON_YEARS
 
             row["drempels"].append(
                 {
@@ -282,8 +292,10 @@ def calculate_noise(turbines: list) -> dict:
                         "daly_totaal_25jaar": round(daly_totaal_25jaar, 2),
                         "waarde_rivm_jaar_euro": round(daly_waarde_rivm_jaar),
                         "waarde_pbl_jaar_euro": round(daly_waarde_pbl_jaar),
+                        "waarde_zin_jaar_euro": round(daly_waarde_zin_jaar),
                         "waarde_rivm_25jaar_euro": round(daly_waarde_rivm_25jaar),
                         "waarde_pbl_25jaar_euro": round(daly_waarde_pbl_25jaar),
+                        "waarde_zin_25jaar_euro": round(daly_waarde_zin_25jaar),
                     },
                 }
             )
@@ -300,6 +312,7 @@ def calculate_noise(turbines: list) -> dict:
         "daly_dw_ernstige_hinder": DALY_DW_ERNSTIGE_HINDER,
         "daly_waarde_rivm_euro": DALY_VALUE_RIVM_EURO,
         "daly_waarde_pbl_euro": DALY_VALUE_PBL_EURO,
+        "daly_waarde_zin_euro": DALY_VALUE_ZIN_EURO,
         "rijen": rows,
     }
 

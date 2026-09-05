@@ -286,16 +286,17 @@
       </div>
 
       <div class="card" style="margin-top: var(--space-5); max-width: 78ch;">
-        <h2>Twee manieren om een DALY te waarderen</h2>
-        <p class="card-desc">Er bestaat geen wettelijk vastgelegd bedrag per DALY. Dit model toont daarom, naast elkaar, twee officiële Nederlandse overheidswaarden:</p>
+        <h2>Drie manieren om een DALY te waarderen</h2>
+        <p class="card-desc">Er bestaat geen wettelijk vastgelegd bedrag per DALY. Dit model toont daarom, naast elkaar, drie officiële Nederlandse overheidswaarden:</p>
         <table style="margin-top: var(--space-3);">
           <thead><tr><th>Bron</th><th>Waarde per DALY</th><th>Toepassingsgebied</th></tr></thead>
           <tbody>
             <tr><td>RIVM (2025) — basisscenario</td><td>€ 50.000</td><td>MKBA gezonde leefomgeving</td></tr>
             <tr><td>PBL (2012) — milieubeleid</td><td>minimaal € 70.000</td><td>MKBA's milieubeleid, incl. windturbines (Viscusi &amp; Aldy, 2003)</td></tr>
+            <tr><td>Zorginstituut Nederland (2024) — referentiewaarde zorg</td><td>€ 80.000</td><td>Kosteneffectiviteitsdrempel zorg, via QALY-DALY-spiegelrelatie; ook de waarde uit de conclusie van de positioning paper</td></tr>
           </tbody>
         </table>
-        <p style="margin-top: var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted);">Bronnen: <a href="https://www.rivm.nl/sites/default/files/2025-02/Werken%20aan%20een%20gezonde%20leefomgeving%20met%20behulp%20van%20maatschappelijke%20kosten-batenanalyses%20(MKBA's).pdf" target="_blank" rel="noopener noreferrer">RIVM (2025), Werken aan een gezonde leefomgeving met behulp van MKBA's</a>; <a href="https://www.pbl.nl/sites/default/files/downloads/PBL_2012_Gezondheid_in_MKBAs_van_omgevingsbeleid_550051004.pdf" target="_blank" rel="noopener noreferrer">PBL (2012), Gezondheid in maatschappelijke kosten-batenanalyses van omgevingsbeleid</a>. RIVM noemt in dezelfde publicatie ook een alternatieve waarde van € 100.000/DALY; dit model rekent uitsluitend met de twee bovenstaande, expliciet DALY-gerelateerde bedragen.</p>
+        <p style="margin-top: var(--space-3); font-size: var(--text-sm); color: var(--color-text-muted);">Bronnen: <a href="https://www.rivm.nl/sites/default/files/2025-02/Werken%20aan%20een%20gezonde%20leefomgeving%20met%20behulp%20van%20maatschappelijke%20kosten-batenanalyses%20(MKBA's).pdf" target="_blank" rel="noopener noreferrer">RIVM (2025), Werken aan een gezonde leefomgeving met behulp van MKBA's</a>; <a href="https://www.pbl.nl/sites/default/files/downloads/PBL_2012_Gezondheid_in_MKBAs_van_omgevingsbeleid_550051004.pdf" target="_blank" rel="noopener noreferrer">PBL (2012), Gezondheid in maatschappelijke kosten-batenanalyses van omgevingsbeleid</a>; <a href="https://www.zorginstituutnederland.nl/site/binaries/site-content/collections/documents/2024/11/26/beoordelingskader-kosteneffectiviteit-van-zorg/Beoordelingskader+kosteneffectiviteit+van+zorg.pdf" target="_blank" rel="noopener noreferrer">Zorginstituut Nederland (2024), Beoordelingskader kosteneffectiviteit van zorg</a>. RIVM noemt in dezelfde publicatie ook een alternatieve waarde van € 100.000/DALY; dit model rekent uitsluitend met de drie bovenstaande, expliciet DALY-gerelateerde bedragen.</p>
       </div>
 
       <p style="color: var(--color-text-muted); max-width: 72ch; margin-top: var(--space-5); font-size: var(--text-sm);">
@@ -307,23 +308,26 @@
           <thead>
             <tr>
               <th rowspan="2" class="num">Afstand</th>
-              <th colspan="4" class="num noise-group-th">DALY-last 9%<span class="group-sub">RIVM-basisscenario</span></th>
-              <th colspan="4" class="num noise-group-th">DALY-last 30%<span class="group-sub">Tussenscenario</span></th>
-              <th colspan="4" class="num noise-group-th">DALY-last 46%<span class="group-sub">Kritisch scenario</span></th>
+              <th colspan="5" class="num noise-group-th">DALY-last 9%<span class="group-sub">RIVM-basisscenario</span></th>
+              <th colspan="5" class="num noise-group-th">DALY-last 30%<span class="group-sub">Tussenscenario</span></th>
+              <th colspan="5" class="num noise-group-th">DALY-last 46%<span class="group-sub">Kritisch scenario</span></th>
             </tr>
             <tr>
               <th class="num">Personen</th>
               <th class="num">DALY / jaar</th>
               <th class="num">Waarde 25 jr (RIVM € 50k)</th>
               <th class="num">Waarde 25 jr (PBL € 70k)</th>
+              <th class="num">Waarde 25 jr (ZiN € 80k)</th>
               <th class="num">Personen</th>
               <th class="num">DALY / jaar</th>
               <th class="num">Waarde 25 jr (RIVM € 50k)</th>
               <th class="num">Waarde 25 jr (PBL € 70k)</th>
+              <th class="num">Waarde 25 jr (ZiN € 80k)</th>
               <th class="num">Personen</th>
               <th class="num">DALY / jaar</th>
               <th class="num">Waarde 25 jr (RIVM € 50k)</th>
               <th class="num">Waarde 25 jr (PBL € 70k)</th>
+              <th class="num">Waarde 25 jr (ZiN € 80k)</th>
             </tr>
           </thead>
           <tbody id="daly-tbody"></tbody>
@@ -432,7 +436,7 @@
             <p>Module 3 gebruikt exact dezelfde vijf beoordelingsafstanden en dezelfde drie hindernormen (9% RIVM-basisscenario, 30% tussenscenario, 46% kritisch scenario — zie de toelichting bij Module 2) als uitgangspunt. Het model berekent per afstand en per hindernorm hoeveel personen worden getroffen (aantal woningen × hindernorm × gemiddelde CBS-huishoudensgrootte) en vermenigvuldigt dat aantal met de som van twee disability weights: <strong>0,010</strong> voor ernstige slaapverstoring en <strong>0,011</strong> voor ernstige hinder — samen 0,021 DALY per getroffen persoon per jaar. Dit levert de kolom "DALY / jaar" op; vermenigvuldigd met 25 jaar en met de waarde per DALY ontstaat de gemonetariseerde kolom.</p>
             <p>De disability weights zijn de meest recente, in 2024 rechtstreeks bij de algemene bevolking (in vier EU-landen, waaronder Nederland) empirisch gemeten WHO-waarden. Bron: WHO Regional Office for Europe (2024), <a href="https://www.who.int/europe/publications/i/item/WHO-EURO-2024-9196-48968-72969" target="_blank" rel="noopener noreferrer">"Disability weights for noise-related health states in the WHO European Region"</a>, gebaseerd op Charalampous e.a. (2024), <a href="https://bmjpublichealth.bmj.com/content/2/1/e000470" target="_blank" rel="noopener noreferrer">"Estimating disability weights for environmental and non-environmental noise-related health states"</a>, BMJ Public Health. Deze 2024-waarden liggen 79% (slaapverstoring) resp. 45-63% (hinder) lager dan de klassieke WHO-waarden uit 2011 (0,07 / 0,02-0,03) en ook lager dan de RIVM/Van Kamp-waarden uit 2018 (RIVM-rapport 2018-0121: 0,0175 / 0,01). Dit model gebruikt bewust uitsluitend de 2024-cijfers, conform de expliciete keuze in de onderliggende positioning paper, en benoemt de neerwaartse trend hier transparant.</p>
             <p>De DALY-last van hart- en vaatziekten en vroegtijdig overlijden — die WHO/EEA eveneens aan omgevingsgeluid toeschrijven — wordt <strong>niet</strong> meegerekend, omdat daarvoor geen windturbine-specifiek dosis-effectmodel bestaat. De uitkomst van deze module is daarom een conservatieve ondergrens van de werkelijke gezondheidslast, niet een volledige schatting.</p>
-            <p>Voor de monetaire waardering rekent het model met twee bedragen naast elkaar: <strong>€ 50.000 per DALY</strong> (RIVM, 2025, basisscenario uit de MKBA-handreiking "Werken aan een gezonde leefomgeving") en <strong>minimaal € 70.000 per DALY</strong> (PBL, 2012, "Gezondheid in maatschappelijke kosten-batenanalyses van omgevingsbeleid", specifiek voor milieubeleid inclusief windturbines, op basis van Viscusi &amp; Aldy 2003). Beide zijn officiële Nederlandse overheidswaarden; geen van beide is een wettelijk voorgeschreven norm, en het RIVM noemt in dezelfde publicatie ook nog een alternatieve waarde van € 100.000/DALY die dit model niet gebruikt.</p>
+            <p>Voor de monetaire waardering rekent het model met drie bedragen naast elkaar: <strong>€ 50.000 per DALY</strong> (RIVM, 2025, basisscenario uit de MKBA-handreiking "Werken aan een gezonde leefomgeving"), <strong>minimaal € 70.000 per DALY</strong> (PBL, 2012, "Gezondheid in maatschappelijke kosten-batenanalyses van omgevingsbeleid", specifiek voor milieubeleid inclusief windturbines, op basis van Viscusi &amp; Aldy 2003) en <strong>€ 80.000 per DALY</strong> (Zorginstituut Nederland, 2024, referentiewaarde zorg, afgeleid via de QALY-DALY-spiegelrelatie uit de kosteneffectiviteitsdrempel van € 80.000/QALY — dit is ook de waarde waarmee de positioning paper zelf in haar conclusie afsluit). Alle drie zijn officiële Nederlandse overheidswaarden; geen ervan is een wettelijk voorgeschreven norm, en het RIVM noemt in dezelfde publicatie ook nog een alternatieve waarde van € 100.000/DALY die dit model niet gebruikt.</p>
             <p>Let op: het RIVM concludeert dat er een aangetoond, direct verband bestaat tussen windturbinegeluid en ervaren hinder, maar dat het bewijs voor een oorzakelijk verband tussen windturbinegeluid en objectief gemeten slaapverstoring niet eenduidig is. De DW-component voor slaapverstoring moet daarom als onderbouwd, maar niet onomstreden worden gezien. Bron: <a href="https://www.rivm.nl/sites/default/files/2026-02/Factsheet-gezondheidseffecten-van-windturbinegeluid.pdf" target="_blank" rel="noopener noreferrer">RIVM, Factsheet gezondheidseffecten van windturbinegeluid</a>.</p>
           </div>
         </div>
@@ -455,6 +459,7 @@
             <p>DALY disability weights (0,010 slaapverstoring / 0,011 ernstige hinder, 2024): WHO Regional Office for Europe, <a href="https://www.who.int/europe/publications/i/item/WHO-EURO-2024-9196-48968-72969" target="_blank" rel="noopener noreferrer">"Disability weights for noise-related health states in the WHO European Region"</a>, gebaseerd op Charalampous e.a. (2024), <a href="https://bmjpublichealth.bmj.com/content/2/1/e000470" target="_blank" rel="noopener noreferrer">BMJ Public Health</a>.</p>
             <p>Waarde per DALY — € 50.000 (basisscenario): <a href="https://www.rivm.nl/sites/default/files/2025-02/Werken%20aan%20een%20gezonde%20leefomgeving%20met%20behulp%20van%20maatschappelijke%20kosten-batenanalyses%20(MKBA's).pdf" target="_blank" rel="noopener noreferrer">RIVM (2025), Werken aan een gezonde leefomgeving met behulp van maatschappelijke kosten-batenanalyses (MKBA's)</a>.</p>
             <p>Waarde per DALY — minimaal € 70.000 (milieubeleid): <a href="https://www.pbl.nl/sites/default/files/downloads/PBL_2012_Gezondheid_in_MKBAs_van_omgevingsbeleid_550051004.pdf" target="_blank" rel="noopener noreferrer">PBL (2012), Gezondheid in maatschappelijke kosten-batenanalyses van omgevingsbeleid</a>.</p>
+            <p>Waarde per DALY — € 80.000 (referentiewaarde zorg, via QALY-DALY-spiegelrelatie): <a href="https://www.zorginstituutnederland.nl/site/binaries/site-content/collections/documents/2024/11/26/beoordelingskader-kosteneffectiviteit-van-zorg/Beoordelingskader+kosteneffectiviteit+van+zorg.pdf" target="_blank" rel="noopener noreferrer">Zorginstituut Nederland (2024), Beoordelingskader kosteneffectiviteit van zorg</a>.</p>
           </div>
         </div>
       </div>

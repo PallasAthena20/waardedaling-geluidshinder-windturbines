@@ -766,7 +766,8 @@
           <td class="num">${fmtNum(d.aantal_personen, 1)}</td>
           <td class="num">${fmtNum(d.daly.daly_totaal_jaar, 2)}</td>
           <td class="num">${fmtEuro(d.daly.waarde_rivm_25jaar_euro)}</td>
-          <td class="num">${fmtEuro(d.daly.waarde_pbl_25jaar_euro)}</td>`;
+          <td class="num">${fmtEuro(d.daly.waarde_pbl_25jaar_euro)}</td>
+          <td class="num">${fmtEuro(d.daly.waarde_zin_25jaar_euro)}</td>`;
         return `
       <tr>
         <td class="num">${fmtDist(row.afstand_m)}</td>
