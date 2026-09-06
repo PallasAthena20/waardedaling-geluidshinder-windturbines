@@ -577,6 +577,83 @@
   }
 
   /* ---------------------------------------------------------------------
+     PDF-export: kaartafbeelding met overlays
+     De turbine-nummerbadges en windrichtingpijlen zijn losse DOM-markers
+     boven op de MapLibre-canvas (voor interactiviteit). Een simpele
+     canvas.toDataURL() van de kaart zelf slaat die DOM-laag over, dus
+     de turbines en pijlen ontbraken in het PDF-rapport. Deze functie
+     tekent ze alsnog handmatig op een kopie van de kaartafbeelding voor
+     export, op basis van de geprojecteerde pixelpositie van elke turbine.
+     --------------------------------------------------------------------- */
+  function drawWindArrowOnCanvas(ctx, x, y, angleRad, dpr) {
+    const H = 58 * dpr;
+    const headLen = 15 * dpr;
+    const headHalfW = 8.5 * dpr;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angleRad);
+    ctx.strokeStyle = '#c8553d';
+    ctx.fillStyle = '#c8553d';
+    ctx.lineWidth = 4.5 * dpr;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, H / 2);
+    ctx.lineTo(0, -H / 2 + headLen);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, -H / 2);
+    ctx.lineTo(headHalfW, -H / 2 + headLen);
+    ctx.lineTo(-headHalfW, -H / 2 + headLen);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawTurbineBadgeOnCanvas(ctx, x, y, dpr, number) {
+    const r = 13 * dpr;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#0d6f66';
+    ctx.fill();
+    ctx.lineWidth = 2 * dpr;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `700 ${11 * dpr}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(number), x, y + 1 * dpr);
+    ctx.restore();
+  }
+
+  function captureMapImageWithOverlays(mapInstance, { withTurbineBadges = false } = {}) {
+    const srcCanvas = mapInstance.getCanvas();
+    const w = srcCanvas.width;
+    const h = srcCanvas.height;
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = w;
+    outCanvas.height = h;
+    const ctx = outCanvas.getContext('2d');
+    ctx.drawImage(srcCanvas, 0, 0, w, h);
+
+    const container = mapInstance.getContainer();
+    const dpr = container.clientWidth ? w / container.clientWidth : (window.devicePixelRatio || 1);
+    const bearing = mapInstance.getBearing ? mapInstance.getBearing() : 0;
+    const angleRad = ((PREVAILING_WIND_BEARING_DEG - bearing) * Math.PI) / 180;
+
+    turbines.forEach((t, i) => {
+      const p = mapInstance.project([t.lon, t.lat]);
+      const x = p.x * dpr;
+      const y = p.y * dpr;
+      drawWindArrowOnCanvas(ctx, x, y, angleRad, dpr);
+      if (withTurbineBadges) drawTurbineBadgeOnCanvas(ctx, x, y, dpr, i + 1);
+    });
+
+    return outCanvas.toDataURL('image/png');
+  }
+
+  /* ---------------------------------------------------------------------
      Turbine list UI
      --------------------------------------------------------------------- */
   const turbineListEl = document.getElementById('turbine-list');
@@ -1130,14 +1207,20 @@
         let map1Image = null;
         let map2Image = null;
         try {
-          map1Image = map.getCanvas().toDataURL('image/png');
+          map1Image = captureMapImageWithOverlays(map, { withTurbineBadges: true });
         } catch (imgErr) {
           console.error('Kaart 1 kon niet worden vastgelegd', imgErr);
+          try {
+            map1Image = map.getCanvas().toDataURL('image/png');
+          } catch (_) {}
         }
         try {
-          map2Image = noiseMap.getCanvas().toDataURL('image/png');
+          map2Image = captureMapImageWithOverlays(noiseMap, { withTurbineBadges: false });
         } catch (imgErr) {
           console.error('Kaart 2 kon niet worden vastgelegd', imgErr);
+          try {
+            map2Image = noiseMap.getCanvas().toDataURL('image/png');
+          } catch (_) {}
         }
 
         const res = await fetch(`${API}/api/generate-report`, {
