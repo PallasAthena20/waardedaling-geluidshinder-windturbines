@@ -607,6 +607,7 @@ def _footer(canvas, doc):
     canvas.setFont(FONT_REGULAR, 6.8)
     canvas.setFillColor(TEXT_MUTED)
     canvas.drawString(MARGIN, 0.7 * cm, "Windturbine Impactrapport \u2014 automatisch gegenereerd, geen juridisch advies")
+    canvas.drawCentredString(PAGE_SIZE[0] / 2, 0.7 * cm, "\u00a9 2026 Athena. Alle rechten voorbehouden.")
     canvas.drawRightString(PAGE_SIZE[0] - MARGIN, 0.7 * cm, f"Pagina {doc.page}")
     canvas.restoreState()
 
