@@ -50,7 +50,7 @@
     <div class="wrap">
       <p class="eyebrow">Gratis rekenmodel · elke locatie in Nederland</p>
       <h1>Waardedaling &amp; geluidshinder van windturbines</h1>
-      <p>Geef aan waar een of meer windturbines gepland zijn. Module 1 berekent de waardedaling van woningen volgens het model van <a href="https://doi.org/10.1016/j.enpol.2021.112327" target="_blank" rel="noopener noreferrer">Droës &amp; Koster (2021)</a> (inclusief de 4%-NMR-splitsing). Module 2 berekent daaronder, voor dezelfde locatie(s), het geluidsniveau op vijf vaste afstanden (500 / 800 / 1.300 / 2.000 / 5.000 m), met de bijbehorende geluidshinder-aandelen en geschatte zorgkosten. Module 3 zet diezelfde geluidshinder-cijfers om in gezondheidslast (DALY's) en monetariseert die volgens twee overheidsbronnen. Module 4 rekent, los van de ingevoerde locatie(s), de bouw-/investeringskosten per turbine door op basis van het officiële PBL-eindadvies SDE++ 2026. Module 5 bundelt alle resultaten van de huidige invoer, inclusief kaarten, in één downloadbaar PDF-rapport met een best/middle/worst-case scenarioanalyse en een volledige methodologie-bijlage.</p>
+      <p>Geef aan waar een of meer windturbines gepland zijn. Module 1 berekent de waardedaling van woningen volgens het model van <a href="https://doi.org/10.1016/j.enpol.2021.112327" target="_blank" rel="noopener noreferrer">Droës &amp; Koster (2021)</a> (inclusief de 4%-NMR-splitsing). Module 2 berekent daaronder, voor dezelfde locatie(s), het geluidsniveau op vijf vaste afstanden (500 / 800 / 1.300 / 2.000 / 5.000 m), met de bijbehorende geluidshinder-aandelen en geschatte zorgkosten. Module 2a toont daarnaast, voor een zelf gekozen windrichting, hoe die geluidscontouren asymmetrisch — en 's nachts verder — doordringen. Module 3 zet diezelfde geluidshinder-cijfers om in gezondheidslast (DALY's) en monetariseert die volgens twee overheidsbronnen. Module 4 rekent, los van de ingevoerde locatie(s), de bouw-/investeringskosten per turbine door op basis van het officiële PBL-eindadvies SDE++ 2026. Module 5 bundelt alle resultaten van de huidige invoer, inclusief kaarten, in één downloadbaar PDF-rapport met een best/middle/worst-case scenarioanalyse en een volledige methodologie-bijlage.</p>
       <div class="hero-meta">
         <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg> Werkt voor elke plaats, straat, postcode of GPS-coördinaat</span>
         <span class="pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18.4 8.6 12 15 8.5 11.5 3.5 16.5"/></svg> Peer-reviewed methodiek (Energy Policy 2021, RIVM, TNO)</span>
@@ -262,6 +262,70 @@
 
       <div id="noise-empty" class="empty-state" style="margin-top: var(--space-4);">
         <p>Voer hierboven één of meer turbinelocaties in en klik op "Berekenen" om ook de geluidshinder-tabel te vullen.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module 2a: geluidscontouren per windrichting, dag versus nacht -->
+  <section id="module2a-results">
+    <div class="wrap">
+      <p class="eyebrow">Module 2a — Resultaat</p>
+      <h2 style="font-size: var(--text-xl); font-weight:650; margin-top: var(--space-2);">Geluidscontouren per windrichting — dag versus nacht</h2>
+      <p style="color: var(--color-text-muted); max-width: 76ch; margin-top: var(--space-2);">
+        Module 2 hierboven gebruikt vaste, symmetrische afstandscirkels. In werkelijkheid draagt geluid verder mee <em>met</em> de wind (downwind) dan er <em>tegenin</em> (upwind) — en 's nachts draagt geluid door windschering en een stabielere atmosfeer aantoonbaar verder dan overdag. Kies hieronder een windrichting: het model toont voor <strong>hoorbaar geluid</strong>, <strong>laagfrequent geluid</strong> en <strong>infrasoon</strong> de bijbehorende asymmetrische reikwijdte bij <em>worst-case</em> atmosferische omstandigheden, apart voor dag en nacht.
+      </p>
+
+      <div class="card" style="margin-top: var(--space-5); max-width: 78ch;">
+        <h2>Windrichting instellen</h2>
+        <p class="card-desc">Geef aan uit welke richting de wind waait — de contouren op beide kaarten passen zich direct aan.</p>
+        <div class="dir-picker" id="dir-picker" role="group" aria-label="Windrichting (waar de wind vandaan komt)">
+          <button type="button" class="dir-btn" data-deg="0">N</button>
+          <button type="button" class="dir-btn" data-deg="45">NO</button>
+          <button type="button" class="dir-btn" data-deg="90">O</button>
+          <button type="button" class="dir-btn" data-deg="135">ZO</button>
+          <button type="button" class="dir-btn" data-deg="180">Z</button>
+          <button type="button" class="dir-btn active" data-deg="225">ZW</button>
+          <button type="button" class="dir-btn" data-deg="270">W</button>
+          <button type="button" class="dir-btn" data-deg="315">NW</button>
+        </div>
+        <p class="field-hint" id="dir-readout" style="margin-top: var(--space-3);"></p>
+      </div>
+
+      <div class="card" style="margin-top: var(--space-5); max-width: 78ch;">
+        <h2>Hoe vaak komen deze worst-case omstandigheden voor?</h2>
+        <p class="card-desc">De "nacht"-kaart hiernaast is geen uitzondering, maar een regelmatig voorkomende situatie in Nederland:</p>
+        <div class="kpi-grid" style="margin-top: var(--space-4);">
+          <div class="kpi-card">
+            <div class="kpi-label">'s Nachts — stabiele atmosfeer (Pasquill-klasse E/F)</div>
+            <div class="kpi-value">30 – 40%</div>
+            <div class="kpi-sub">van de nachtelijke uren in het binnenland van Nederland (± 15% vlak aan de kust)</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Overdag — vergelijkbaar stabiele situatie</div>
+            <div class="kpi-value">Enkele %</div>
+            <div class="kpi-sub">door zonneopwarming is de atmosfeer overdag vrijwel altijd onstabiel of neutraal</div>
+          </div>
+        </div>
+        <p style="margin-top: var(--space-4); font-size: var(--text-sm); color: var(--color-text-muted);">Bron: <a href="https://docs.wind-watch.org/vandenBerg-SoundOfHighWinds.pdf" target="_blank" rel="noopener noreferrer">van den Berg, G.P. (2004), "Effects of the wind profile at night on wind turbine sound", Journal of Sound and Vibration</a>. De precieze reikwijdtes hieronder zijn een illustratieve, worst-case inschatting op basis van de literatuur (zie de positionpaper "Geluidpropagatie windturbines"), geen exacte akoestische berekening per locatie.</p>
+      </div>
+
+      <div class="dual-map-grid" style="margin-top: var(--space-5);">
+        <div class="card">
+          <h2>Overdag</h2>
+          <p class="card-desc">Onstabiele/neutrale atmosfeer: kortere reikwijdte, minder uitgesproken asymmetrie.</p>
+          <div id="module2a-day-map" style="margin-top: var(--space-4);"></div>
+          <div class="map-legend" id="module2a-day-legend"></div>
+        </div>
+        <div class="card">
+          <h2>'s Nachts (worst case)</h2>
+          <p class="card-desc">Stabiele atmosfeer, windschering en minder achtergrondgeluid: grotere reikwijdte, sterkere asymmetrie.</p>
+          <div id="module2a-night-map" style="margin-top: var(--space-4);"></div>
+          <div class="map-legend" id="module2a-night-legend"></div>
+        </div>
+      </div>
+
+      <div id="module2a-empty" class="empty-state" style="margin-top: var(--space-4);">
+        <p>Voer hierboven één of meer turbinelocaties in om de contouren te tonen.</p>
       </div>
     </div>
   </section>

@@ -577,6 +577,240 @@
   }
 
   /* ---------------------------------------------------------------------
+     Module 2a — geluidscontouren per (zelf gekozen) windrichting, dag vs nacht
+     De contouren zijn een illustratieve, worst-case inschatting: een basis-
+     straal per geluidssoort/dagdeel wordt asymmetrisch uitgerekt in de
+     downwind-richting en ingekrompen in de upwind-richting via een
+     cosinus-overgang rond de gekozen windrichting. Dit is geen exacte
+     akoestische berekening per locatie, maar een schematische vertaling
+     van de bevindingen uit de positionpaper "Geluidpropagatie windturbines"
+     (Evans & Cooper 2012; van den Berg 2004) naar de kaart.
+     --------------------------------------------------------------------- */
+  const MODULE2A_SOUND_TYPES = [
+    {
+      key: 'hoorbaar',
+      label: 'Hoorbaar geluid',
+      color: '#0d6f66',
+      day: { base_km: 1.2, downwind: 1.25, upwind: 0.55 },
+      night: { base_km: 1.8, downwind: 1.35, upwind: 0.5 },
+    },
+    {
+      key: 'laagfrequent',
+      label: 'Laagfrequent geluid',
+      color: '#d69a3a',
+      day: { base_km: 2.0, downwind: 1.15, upwind: 0.75 },
+      night: { base_km: 3.0, downwind: 1.2, upwind: 0.7 },
+    },
+    {
+      key: 'infrasoon',
+      label: 'Infrasoon geluid',
+      color: '#7a4fc8',
+      day: { base_km: 6.0, downwind: 1.05, upwind: 0.95 },
+      night: { base_km: 12.0, downwind: 1.05, upwind: 0.95 },
+    },
+  ];
+
+  const DIR_LABELS_FROM = {
+    0: 'noorden',
+    45: 'noordoosten',
+    90: 'oosten',
+    135: 'zuidoosten',
+    180: 'zuiden',
+    225: 'zuidwesten',
+    270: 'westen',
+    315: 'noordwesten',
+  };
+  let module2aWindFromDeg = 225; // ZW — overheersende windrichting in Nederland (bron: KNMI), zelfde default als elders in het model
+
+  function createModule2aMap(containerId) {
+    const m = new maplibregl.Map({
+      container: containerId,
+      style: 'https://tiles.openfreemap.org/styles/positron',
+      center: [5.2913, 52.1326],
+      zoom: 6.4,
+      preserveDrawingBuffer: true,
+    });
+    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    m.getContainer().appendChild(createCompassRoseEl());
+    return m;
+  }
+
+  const module2aDayMap = document.getElementById('module2a-day-map') ? createModule2aMap('module2a-day-map') : null;
+  const module2aNightMap = document.getElementById('module2a-night-map') ? createModule2aMap('module2a-night-map') : null;
+
+  let module2aDayReady = false;
+  let module2aNightReady = false;
+
+  function setupModule2aMapLayers(m, prefix) {
+    m.addSource(prefix + '-circles', { type: 'geojson', data: emptyFC() });
+    m.addLayer({
+      id: prefix + '-circles-line',
+      type: 'line',
+      source: prefix + '-circles',
+      paint: { 'line-color': ['get', 'color'], 'line-width': 1.8 },
+    });
+    m.addSource(prefix + '-markers', { type: 'geojson', data: emptyFC() });
+    m.addLayer({
+      id: prefix + '-markers-point',
+      type: 'circle',
+      source: prefix + '-markers',
+      paint: {
+        'circle-radius': 6,
+        'circle-color': '#0d6f66',
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#ffffff',
+      },
+    });
+  }
+
+  if (module2aDayMap) {
+    module2aDayMap.on('load', () => {
+      module2aDayReady = true;
+      setupModule2aMapLayers(module2aDayMap, 'm2a-day');
+      renderModule2aLegend('module2a-day-legend', 'day');
+      updateModule2aMaps();
+    });
+  }
+  if (module2aNightMap) {
+    module2aNightMap.on('load', () => {
+      module2aNightReady = true;
+      setupModule2aMapLayers(module2aNightMap, 'm2a-night');
+      renderModule2aLegend('module2a-night-legend', 'night');
+      updateModule2aMaps();
+    });
+  }
+
+  function fmtKm(km) {
+    return km.toFixed(1).replace('.', ',');
+  }
+
+  function renderModule2aLegend(elId, period) {
+    const legendEl = document.getElementById(elId);
+    if (!legendEl) return;
+    legendEl.innerHTML =
+      MODULE2A_SOUND_TYPES.map((s) => {
+        const p = s[period];
+        const minKm = p.base_km * p.upwind;
+        const maxKm = p.base_km * p.downwind;
+        return `<span class="lg-item"><span class="swatch" style="background:${s.color}"></span>${s.label} — ${fmtKm(minKm)}–${fmtKm(maxKm)} km</span>`;
+      }).join('') + `<span class="lg-item"><span class="wind-swatch"></span>Gekozen windrichting</span>`;
+  }
+
+  function buildModule2aContour(lon, lat, baseKm, downwindFactor, upwindFactor, downwindBearingDeg, color, turbineId) {
+    const coords = [];
+    for (let deg = 0; deg <= 360; deg += 5) {
+      const diff = ((deg - downwindBearingDeg + 540) % 360) - 180; // -180..180
+      const blend = (1 + Math.cos((diff * Math.PI) / 180)) / 2; // 1 pal downwind, 0 pal upwind
+      const factor = upwindFactor + (downwindFactor - upwindFactor) * blend;
+      const radiusKm = baseKm * factor;
+      const pt = turf.destination([lon, lat], radiusKm, deg, { units: 'kilometers' });
+      coords.push(pt.geometry.coordinates);
+    }
+    coords.push(coords[0]);
+    const poly = turf.polygon([coords]);
+    poly.properties = { id: turbineId, color };
+    return poly;
+  }
+
+  function extendBoundsForRadius(bounds, lon, lat, radiusKm) {
+    [0, 90, 180, 270].forEach((brg) => {
+      const pt = turf.destination([lon, lat], radiusKm, brg, { units: 'kilometers' });
+      bounds.extend(pt.geometry.coordinates);
+    });
+  }
+
+  let module2aWindMarkerEls = { day: [], night: [] };
+
+  function updateModule2aWindMarkers() {
+    const downwindBearing = (module2aWindFromDeg + 180) % 360;
+    [
+      ['day', module2aDayMap],
+      ['night', module2aNightMap],
+    ].forEach(([period, m]) => {
+      if (!m) return;
+      module2aWindMarkerEls[period].forEach((mk) => mk.remove());
+      module2aWindMarkerEls[period] = [];
+      turbines.forEach((t) => {
+        const el = createWindArrowEl();
+        const marker = new maplibregl.Marker({
+          element: el,
+          anchor: 'center',
+          rotation: downwindBearing,
+          rotationAlignment: 'map',
+          pitchAlignment: 'map',
+        })
+          .setLngLat([t.lon, t.lat])
+          .addTo(m);
+        module2aWindMarkerEls[period].push(marker);
+      });
+    });
+  }
+
+  function updateModule2aMaps() {
+    const emptyEl = document.getElementById('module2a-empty');
+    if (emptyEl) emptyEl.style.display = turbines.length ? 'none' : '';
+    const downwindBearing = (module2aWindFromDeg + 180) % 360;
+
+    [
+      ['day', module2aDayMap, module2aDayReady, 'm2a-day'],
+      ['night', module2aNightMap, module2aNightReady, 'm2a-night'],
+    ].forEach(([period, m, ready, prefix]) => {
+      if (!m || !ready) return;
+      const circleFeatures = [];
+      const markerFeatures = [];
+      let maxRadiusKm = 0;
+      MODULE2A_SOUND_TYPES.forEach((s) => {
+        maxRadiusKm = Math.max(maxRadiusKm, s[period].base_km * s[period].downwind);
+      });
+      turbines.forEach((t) => {
+        MODULE2A_SOUND_TYPES.forEach((s) => {
+          const p = s[period];
+          circleFeatures.push(
+            buildModule2aContour(t.lon, t.lat, p.base_km, p.downwind, p.upwind, downwindBearing, s.color, t.id)
+          );
+        });
+        markerFeatures.push({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [t.lon, t.lat] },
+          properties: { id: t.id },
+        });
+      });
+      m.getSource(prefix + '-circles') &&
+        m.getSource(prefix + '-circles').setData({ type: 'FeatureCollection', features: circleFeatures });
+      m.getSource(prefix + '-markers') &&
+        m.getSource(prefix + '-markers').setData({ type: 'FeatureCollection', features: markerFeatures });
+      if (turbines.length) {
+        const bounds = new maplibregl.LngLatBounds();
+        turbines.forEach((t) => {
+          bounds.extend([t.lon, t.lat]);
+          extendBoundsForRadius(bounds, t.lon, t.lat, maxRadiusKm);
+        });
+        m.fitBounds(bounds, { padding: 60, maxZoom: 11 });
+      }
+    });
+    updateModule2aWindMarkers();
+  }
+
+  function updateModule2aDirReadout() {
+    const el = document.getElementById('dir-readout');
+    if (!el) return;
+    const downwind = (module2aWindFromDeg + 180) % 360;
+    el.textContent = `Wind uit het ${DIR_LABELS_FROM[module2aWindFromDeg]} → het geluid draagt het verst door richting het ${DIR_LABELS_FROM[downwind]}.`;
+  }
+
+  const dirButtons = document.querySelectorAll('.dir-btn');
+  dirButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      dirButtons.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      module2aWindFromDeg = parseInt(btn.dataset.deg, 10);
+      updateModule2aDirReadout();
+      updateModule2aMaps();
+    });
+  });
+  updateModule2aDirReadout();
+
+  /* ---------------------------------------------------------------------
      PDF-export: kaartafbeelding met overlays
      De turbine-nummerbadges en windrichtingpijlen zijn losse DOM-markers
      boven op de MapLibre-canvas (voor interactiviteit). Een simpele
@@ -686,6 +920,7 @@
         renderTurbineList();
         renderMapCircles();
         renderNoiseMapCircles();
+        updateModule2aMaps();
         hideResults();
       });
       row.appendChild(removeBtn);
@@ -717,6 +952,7 @@
     renderTurbineList();
     renderMapCircles();
     renderNoiseMapCircles();
+    updateModule2aMaps();
     hideResults();
     searchInput.value = '';
     coordsInput.value = '';
@@ -831,6 +1067,7 @@
       })
       .join('');
     renderNoiseMapCircles();
+    updateModule2aMaps();
   }
 
   const dalyTbody = document.getElementById('daly-tbody');
