@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.lib.utils import ImageReader
@@ -44,8 +44,22 @@ TEAL = colors.HexColor("#0d6f66")
 TEAL_LIGHT = colors.HexColor("#e8f2f0")
 TEXT_MUTED = colors.HexColor("#5b6763")
 BORDER = colors.HexColor("#d7ded9")
-PAGE_SIZE = landscape(A4)
+PAGE_SIZE = A4  # staand (portrait) formaat
 MARGIN = 1.4 * cm
+CONTENT_WIDTH = PAGE_SIZE[0] - 2 * MARGIN
+
+
+def _fit_widths(widths, available=None):
+    """Schaalt een lijst kolombreedtes (in punten/cm) proportioneel zodat de
+    som exact de beschikbare paginabreedte vult. Nodig omdat alle kolombreedtes
+    hieronder oorspronkelijk afgestemd waren op het bredere liggende formaat."""
+    if available is None:
+        available = CONTENT_WIDTH
+    total = sum(widths)
+    if not total:
+        return widths
+    factor = available / total
+    return [w * factor for w in widths]
 
 
 def _styles():
@@ -190,7 +204,9 @@ def _decode_image(b64_str):
         return None
 
 
-def _map_image_flowable(b64_str, max_w=17.5 * cm, max_h=8.2 * cm):
+def _map_image_flowable(b64_str, max_w=None, max_h=9.5 * cm):
+    if max_w is None:
+        max_w = CONTENT_WIDTH
     raw = _decode_image(b64_str)
     if raw is None:
         return None
@@ -278,7 +294,7 @@ def _build_cover(story, st, data):
                 _p(t.get("category_label", t.get("category", "")), st["cell"]),
                 _p(t.get("method", ""), st["cell"]),
             ])
-        tbl = Table(rows, colWidths=[5 * cm, 5 * cm, 7.5 * cm, 3 * cm])
+        tbl = Table(rows, colWidths=_fit_widths([5 * cm, 5 * cm, 7.5 * cm, 3 * cm]))
         tbl.setStyle(_table_style())
         story.append(tbl)
         story.append(Spacer(1, 0.5 * cm))
@@ -350,7 +366,7 @@ def _build_module1(story, st, module1, map_img_b64):
                 _p(fmt_euro(b.get("waardedaling_per_woning_euro")), st["cellnum"]),
                 _p(fmt_euro(b.get("nadeelcompensatie_euro")), st["cellnum"]),
             ])
-        col_w = [3.4*cm, 2.7*cm, 1.8*cm, 1.7*cm, 2.2*cm, 2.3*cm, 2.3*cm, 2.2*cm, 2.3*cm]
+        col_w = _fit_widths([3.4*cm, 2.7*cm, 1.8*cm, 1.7*cm, 2.2*cm, 2.3*cm, 2.3*cm, 2.2*cm, 2.3*cm])
         tbl = Table(rows, colWidths=col_w, repeatRows=1)
         tbl.setStyle(_table_style())
         story.append(tbl)
@@ -369,7 +385,7 @@ _HINDERNORM_LABELS = {
 }
 
 
-def _build_module23(story, st, module23, map_img_b64):
+def _build_module2(story, st, module23, map_img_b64):
     if not module23:
         return
     story.append(_p("Module 2 \u2014 Geluidshinder &amp; Zorgkosten", st["h1"]))
@@ -387,7 +403,7 @@ def _build_module23(story, st, module23, map_img_b64):
     rows_data = module23.get("rijen", [])
     if rows_data:
         n_thresholds = len(rows_data[0]["drempels"])
-        col_w = [2.3*cm, 2.5*cm, 2.1*cm, 2.1*cm, 2.3*cm, 2.5*cm, 3.3*cm, 3.5*cm]
+        col_w = _fit_widths([2.3*cm, 2.5*cm, 2.1*cm, 2.1*cm, 2.3*cm, 2.5*cm, 3.3*cm, 3.5*cm])
         for idx in range(n_thresholds):
             pct = rows_data[0]["drempels"][idx].get("drempel_pct")
             label = _HINDERNORM_LABELS.get(pct, f"{fmt_num(pct, 0)}%" if pct is not None else f"Norm {idx + 1}")
@@ -416,6 +432,70 @@ def _build_module23(story, st, module23, map_img_b64):
                 story.append(Spacer(1, 0.4 * cm))
     story.append(PageBreak())
 
+
+_MODULE2A_PERIOD_LABELS = {"day": "Overdag", "night": "'s Nachts (worst case)"}
+
+
+def _build_module2a(story, st, module2a, day_img_b64, night_img_b64):
+    if not module2a:
+        return
+    story.append(_p("Module 2a \u2014 Geluidscontouren per windrichting", st["h1"]))
+    story.append(_p(
+        "Geluid draagt verder mee met de wind (downwind) dan er tegenin (upwind) \u2014 en 's nachts draagt "
+        "geluid, door windschering en een stabielere atmosfeer, aantoonbaar verder dan overdag. Onderstaande "
+        "kaarten tonen voor hoorbaar geluid, laagfrequent geluid en infrasoon de asymmetrische reikwijdte bij "
+        "worst-case atmosferische omstandigheden, apart voor dag en nacht.", st["body"]
+    ))
+    wind_from = module2a.get("wind_from_label")
+    wind_to = module2a.get("downwind_label")
+    if wind_from and wind_to:
+        story.append(_p(
+            f"Gekozen windrichting: wind uit het {wind_from} \u2014 het geluid draagt het verst door "
+            f"richting het {wind_to}.", st["body"]
+        ))
+    story.append(Spacer(1, 0.15 * cm))
+
+    sound_types = module2a.get("sound_types") or []
+    for period, img_b64 in (("day", day_img_b64), ("night", night_img_b64)):
+        period_flow = [_p(_MODULE2A_PERIOD_LABELS.get(period, period), st["h3"])]
+        img_flow = _map_image_flowable(img_b64, max_h=9.5 * cm)
+        if img_flow:
+            period_flow.append(img_flow)
+            period_flow.append(Spacer(1, 0.2 * cm))
+        if sound_types:
+            header = [_p(h, st["cellhead"]) for h in ["Geluidssoort", "Reikwijdte upwind \u2013 downwind"]]
+            rows = [header]
+            for s in sound_types:
+                p = s.get(period, {})
+                base_km = p.get("base_km", 0)
+                min_km = base_km * p.get("upwind", 1)
+                max_km = base_km * p.get("downwind", 1)
+                rows.append([
+                    _p(s.get("label", ""), st["cell"]),
+                    _p(f"{fmt_num(min_km, 1)} \u2013 {fmt_num(max_km, 1)} km", st["cellnum"]),
+                ])
+            tbl = Table(rows, colWidths=_fit_widths([9 * cm, 9.2 * cm]), hAlign="LEFT")
+            tbl.setStyle(_table_style())
+            period_flow.append(tbl)
+        period_flow.append(Spacer(1, 0.45 * cm))
+        story.append(KeepTogether(period_flow))
+
+    story.append(_p(
+        "'s Nachts komt deze stabiele atmosfeer (Pasquill-klasse E/F) 30\u201340% van de nachtelijke uren voor "
+        "in het binnenland van Nederland (\u00b1 15% vlak aan de kust); overdag is de atmosfeer door "
+        "zonneopwarming vrijwel altijd onstabiel of neutraal. Bron: van den Berg, G.P. (2004), \u201cEffects of "
+        "the wind profile at night on wind turbine sound\u201d, Journal of Sound and Vibration "
+        "(https://docs.wind-watch.org/vandenBerg-SoundOfHighWinds.pdf). De reikwijdtes zijn een illustratieve, "
+        "worst-case inschatting op basis van de literatuur, geen exacte akoestische berekening per locatie.",
+        st["small"]
+    ))
+    story.append(PageBreak())
+
+
+def _build_module3(story, st, module23):
+    if not module23:
+        return
+    rows_data = module23.get("rijen", [])
     story.append(_p("Module 3 \u2014 Gezondheidslast (DALY's)", st["h1"]))
     story.append(_p(
         "Dezelfde afstanden en hindernormen omgezet in Disability-Adjusted Life Years (WHO-maat voor "
@@ -426,7 +506,7 @@ def _build_module23(story, st, module23, map_img_b64):
     ))
     if rows_data:
         n_thresholds = len(rows_data[0]["drempels"])
-        col_w = [2.0*cm, 1.9*cm, 1.7*cm, 2.5*cm, 2.7*cm, 2.5*cm, 2.7*cm, 2.5*cm, 2.7*cm]
+        col_w = _fit_widths([2.0*cm, 1.9*cm, 1.7*cm, 2.5*cm, 2.7*cm, 2.5*cm, 2.7*cm, 2.5*cm, 2.7*cm])
         for idx in range(n_thresholds):
             pct = rows_data[0]["drempels"][idx].get("drempel_pct")
             label = _HINDERNORM_LABELS.get(pct, f"{fmt_num(pct, 0)}%" if pct is not None else f"Norm {idx + 1}")
@@ -501,7 +581,7 @@ def _build_module4(story, st, module4):
                 _p(fmt_euro(g.get("kosten_per_mwh_jaar1_euro")), st["cellnum"]),
                 _p(fmt_euro(g.get("kosten_per_mwh_levensduur_euro")), st["cellnum"]),
             ])
-        col_w = [3.2*cm, 4.5*cm, 1.8*cm, 2.3*cm, 1.8*cm, 2.3*cm, 3.0*cm, 2.1*cm, 2.1*cm]
+        col_w = _fit_widths([3.2*cm, 4.5*cm, 1.8*cm, 2.3*cm, 1.8*cm, 2.3*cm, 3.0*cm, 2.1*cm, 2.1*cm])
         tbl = Table(rows, colWidths=col_w, repeatRows=1)
         tbl.setStyle(_table_style())
         story.append(tbl)
@@ -560,7 +640,7 @@ def _build_scenario(story, st, module1, module23, module4):
                 _p(fmt_euro(cost3), st["cellnum"]),
                 _p(fmt_euro(total), st["cellnum"]),
             ])
-        col_w = [2.6*cm, 4.3*cm, 3.6*cm, 3.8*cm, 3.8*cm, 4.0*cm]
+        col_w = _fit_widths([2.6*cm, 4.3*cm, 3.6*cm, 3.8*cm, 3.8*cm, 4.0*cm])
         tbl = Table(rows, colWidths=col_w, repeatRows=1)
         style = _table_style()
         style.add("FONTNAME", (0, 1), (0, -1), FONT_BOLD)
@@ -606,9 +686,9 @@ def _footer(canvas, doc):
     canvas.saveState()
     canvas.setFont(FONT_REGULAR, 6.8)
     canvas.setFillColor(TEXT_MUTED)
-    canvas.drawString(MARGIN, 0.7 * cm, "Windturbine Impactrapport \u2014 automatisch gegenereerd, geen juridisch advies")
-    canvas.drawCentredString(PAGE_SIZE[0] / 2, 0.7 * cm, "\u00a9 2026 Athena. Alle rechten voorbehouden.")
-    canvas.drawRightString(PAGE_SIZE[0] - MARGIN, 0.7 * cm, f"Pagina {doc.page}")
+    canvas.drawString(MARGIN, 0.95 * cm, "Windturbine Impactrapport \u2014 automatisch gegenereerd, geen juridisch advies")
+    canvas.drawRightString(PAGE_SIZE[0] - MARGIN, 0.95 * cm, f"Pagina {doc.page}")
+    canvas.drawCentredString(PAGE_SIZE[0] / 2, 0.45 * cm, "\u00a9 2026 Athena. Alle rechten voorbehouden.")
     canvas.restoreState()
 
 
@@ -624,7 +704,12 @@ def build_report_pdf(data: dict) -> bytes:
 
     _build_cover(story, st, data)
     _build_module1(story, st, data.get("module1"), data.get("map1_image"))
-    _build_module23(story, st, data.get("module23"), data.get("map2_image"))
+    _build_module2(story, st, data.get("module23"), data.get("map2_image"))
+    _build_module2a(
+        story, st, data.get("module2a"),
+        data.get("map2a_day_image"), data.get("map2a_night_image"),
+    )
+    _build_module3(story, st, data.get("module23"))
     _build_module4(story, st, data.get("module4"))
     _build_scenario(story, st, data.get("module1"), data.get("module23"), data.get("module4"))
     _build_methodology_appendix(story, st)

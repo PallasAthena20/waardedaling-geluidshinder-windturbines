@@ -62,13 +62,32 @@ module4 = {
                 "gem_kosten_per_mwh_levensduur_euro": 62.3},
 }
 
+module2a = {
+    "wind_from_label": "zuidwesten",
+    "downwind_label": "noordoosten",
+    "sound_types": [
+        {"key": "hoorbaar", "label": "Hoorbaar geluid",
+         "day": {"base_km": 1.2, "downwind": 1.25, "upwind": 0.55},
+         "night": {"base_km": 1.8, "downwind": 1.35, "upwind": 0.5}},
+        {"key": "laagfrequent", "label": "Laagfrequent geluid",
+         "day": {"base_km": 2.0, "downwind": 1.15, "upwind": 0.75},
+         "night": {"base_km": 3.0, "downwind": 1.2, "upwind": 0.7}},
+        {"key": "infrasoon", "label": "Infrasoon geluid",
+         "day": {"base_km": 6.0, "downwind": 1.05, "upwind": 0.95},
+         "night": {"base_km": 12.0, "downwind": 1.05, "upwind": 0.95}},
+    ],
+}
+
 data = {
     "turbines": module1["turbines"],
     "module1": module1,
     "module23": module23,
+    "module2a": module2a,
     "module4": module4,
     "map1_image": tiny_png_b64,
     "map2_image": tiny_png_b64,
+    "map2a_day_image": tiny_png_b64,
+    "map2a_night_image": tiny_png_b64,
     "generated_at": "06-09-2026 09:40",
 }
 

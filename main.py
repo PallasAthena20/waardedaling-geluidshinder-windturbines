@@ -858,9 +858,12 @@ class ReportIn(BaseModel):
     turbines: list[ReportTurbineIn] = []
     module1: dict | None = None
     module23: dict | None = None
+    module2a: dict | None = None
     module4: dict | None = None
     map1_image: str | None = None
     map2_image: str | None = None
+    map2a_day_image: str | None = None
+    map2a_night_image: str | None = None
 
 
 @app.get("/api/health")
@@ -996,9 +999,12 @@ def api_generate_report(payload: ReportIn):
             "turbines": [t.model_dump() for t in payload.turbines],
             "module1": payload.module1,
             "module23": payload.module23,
+            "module2a": payload.module2a,
             "module4": payload.module4,
             "map1_image": payload.map1_image,
             "map2_image": payload.map2_image,
+            "map2a_day_image": payload.map2a_day_image,
+            "map2a_night_image": payload.map2a_night_image,
         }
         pdf_bytes = report_module.build_report_pdf(data)
         return Response(

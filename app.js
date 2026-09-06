@@ -887,6 +887,32 @@
     return outCanvas.toDataURL('image/png');
   }
 
+  function captureModule2aMapImage(mapInstance) {
+    const srcCanvas = mapInstance.getCanvas();
+    const w = srcCanvas.width;
+    const h = srcCanvas.height;
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = w;
+    outCanvas.height = h;
+    const ctx = outCanvas.getContext('2d');
+    ctx.drawImage(srcCanvas, 0, 0, w, h);
+
+    const container = mapInstance.getContainer();
+    const dpr = container.clientWidth ? w / container.clientWidth : (window.devicePixelRatio || 1);
+    const bearing = mapInstance.getBearing ? mapInstance.getBearing() : 0;
+    const downwindBearing = (module2aWindFromDeg + 180) % 360;
+    const angleRad = ((downwindBearing - bearing) * Math.PI) / 180;
+
+    turbines.forEach((t) => {
+      const p = mapInstance.project([t.lon, t.lat]);
+      const x = p.x * dpr;
+      const y = p.y * dpr;
+      drawWindArrowOnCanvas(ctx, x, y, angleRad, dpr);
+    });
+
+    return outCanvas.toDataURL('image/png');
+  }
+
   /* ---------------------------------------------------------------------
      Turbine list UI
      --------------------------------------------------------------------- */
@@ -1460,6 +1486,37 @@
           } catch (_) {}
         }
 
+        let map2aDayImage = null;
+        let map2aNightImage = null;
+        try {
+          if (module2aDayMap) map2aDayImage = captureModule2aMapImage(module2aDayMap);
+        } catch (imgErr) {
+          console.error('Kaart 2a (dag) kon niet worden vastgelegd', imgErr);
+          try {
+            map2aDayImage = module2aDayMap.getCanvas().toDataURL('image/png');
+          } catch (_) {}
+        }
+        try {
+          if (module2aNightMap) map2aNightImage = captureModule2aMapImage(module2aNightMap);
+        } catch (imgErr) {
+          console.error('Kaart 2a (nacht) kon niet worden vastgelegd', imgErr);
+          try {
+            map2aNightImage = module2aNightMap.getCanvas().toDataURL('image/png');
+          } catch (_) {}
+        }
+        const downwindDeg = (module2aWindFromDeg + 180) % 360;
+        const module2aData = {
+          wind_from_deg: module2aWindFromDeg,
+          wind_from_label: DIR_LABELS_FROM[module2aWindFromDeg],
+          downwind_label: DIR_LABELS_FROM[downwindDeg],
+          sound_types: MODULE2A_SOUND_TYPES.map((s) => ({
+            key: s.key,
+            label: s.label,
+            day: s.day,
+            night: s.night,
+          })),
+        };
+
         const res = await fetch(`${API}/api/generate-report`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1474,9 +1531,12 @@
             })),
             module1: lastResult,
             module23: lastNoiseResult,
+            module2a: module2aData,
             module4: lastInvestResult,
             map1_image: map1Image,
             map2_image: map2Image,
+            map2a_day_image: map2aDayImage,
+            map2a_night_image: map2aNightImage,
           }),
         });
         if (!res.ok) {
