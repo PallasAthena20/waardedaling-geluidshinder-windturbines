@@ -362,13 +362,21 @@ def _build_module1(story, st, module1, map_img_b64):
     story.append(PageBreak())
 
 
+_HINDERNORM_LABELS = {
+    9: "9% \u2014 RIVM-basisscenario (best case)",
+    30: "30% \u2014 tussenscenario (middle case)",
+    46: "46% \u2014 kritisch scenario (worst case)",
+}
+
+
 def _build_module23(story, st, module23, map_img_b64):
     if not module23:
         return
     story.append(_p("Module 2 \u2014 Geluidshinder &amp; Zorgkosten", st["h1"]))
     story.append(_p(
         "Geluidsniveau en geschatte zorgkosten op vijf vaste beoordelingsafstanden, bij drie "
-        "hindernormen: 9% (RIVM-basisscenario), 30% (tussenscenario) en 46% (kritisch scenario).",
+        "hindernormen: 9% (RIVM-basisscenario), 30% (tussenscenario) en 46% (kritisch scenario). "
+        "Per hindernorm een aparte tabel voor de leesbaarheid.",
         st["body"]
     ))
     img_flow = _map_image_flowable(map_img_b64)
@@ -378,92 +386,78 @@ def _build_module23(story, st, module23, map_img_b64):
 
     rows_data = module23.get("rijen", [])
     if rows_data:
-        header1 = [
-            _p("Afstand", st["cellhead"]), _p("Woningen", st["cellhead"]),
-            _p("dB(A)", st["cellhead"]), _p("dB", st["cellhead"]),
-            _p("Pers./hh", st["cellhead"]),
-            _p("Geluidshinder 9%", st["cellhead"]), "", "",
-            _p("Geluidshinder 30%", st["cellhead"]), "", "",
-            _p("Geluidshinder 46%", st["cellhead"]), "", "",
-        ]
-        header2 = [
-            "", "", "", "", "",
-            _p("Won.", st["cellhead"]), _p("Kosten/jr", st["cellhead"]), _p("Kosten 25jr", st["cellhead"]),
-            _p("Won.", st["cellhead"]), _p("Kosten/jr", st["cellhead"]), _p("Kosten 25jr", st["cellhead"]),
-            _p("Won.", st["cellhead"]), _p("Kosten/jr", st["cellhead"]), _p("Kosten 25jr", st["cellhead"]),
-        ]
-        rows = [header1, header2]
-        for r in rows_data:
-            d9, d30, d46 = r["drempels"]
-            row = [
-                _p(fmt_dist(r["afstand_m"]), st["cellnum"]),
-                _p(fmt_num(r["aantal_woningen"], 1), st["cellnum"]),
-                _p(fmt_num(r["dba_7ms"], 1), st["cellnum"]),
-                _p(fmt_num(r["db_onweighted"], 1), st["cellnum"]),
-                _p(fmt_num(r["personen_per_huishouden"], 2), st["cellnum"]),
-            ]
-            for d in (d9, d30, d46):
-                row += [
+        n_thresholds = len(rows_data[0]["drempels"])
+        col_w = [2.3*cm, 2.5*cm, 2.1*cm, 2.1*cm, 2.3*cm, 2.5*cm, 3.3*cm, 3.5*cm]
+        for idx in range(n_thresholds):
+            pct = rows_data[0]["drempels"][idx].get("drempel_pct")
+            label = _HINDERNORM_LABELS.get(pct, f"{fmt_num(pct, 0)}%" if pct is not None else f"Norm {idx + 1}")
+            story.append(_p(f"Hindernorm {label}", st["h3"]))
+            header = [_p(h, st["cellhead"]) for h in [
+                "Afstand", "Woningen", "dB(A)", "dB", "Pers./hh",
+                "Won. (drempel)", "Kosten/jr", "Kosten 25jr",
+            ]]
+            rows = [header]
+            for r in rows_data:
+                d = r["drempels"][idx]
+                rows.append([
+                    _p(fmt_dist(r["afstand_m"]), st["cellnum"]),
+                    _p(fmt_num(r["aantal_woningen"], 1), st["cellnum"]),
+                    _p(fmt_num(r["dba_7ms"], 1), st["cellnum"]),
+                    _p(fmt_num(r["db_onweighted"], 1), st["cellnum"]),
+                    _p(fmt_num(r["personen_per_huishouden"], 2), st["cellnum"]),
                     _p(fmt_num(d["aantal_woningen"], 1), st["cellnum"]),
                     _p(fmt_euro(d["kosten_per_jaar_euro"]), st["cellnum"]),
                     _p(fmt_euro(d["kosten_25jaar_euro"]), st["cellnum"]),
-                ]
-            rows.append(row)
-        col_w = [1.6*cm, 1.7*cm, 1.4*cm, 1.3*cm, 1.5*cm] + [1.55*cm, 1.9*cm, 2.0*cm] * 3
-        tbl = Table(rows, colWidths=col_w, repeatRows=2)
-        style = _table_style(header_rows=2, group_spans=[(5, 0, 7, 0), (8, 0, 10, 0), (11, 0, 13, 0)])
-        tbl.setStyle(style)
-        story.append(tbl)
+                ])
+            tbl = Table(rows, colWidths=col_w, repeatRows=1, hAlign="LEFT")
+            tbl.setStyle(_table_style())
+            story.append(tbl)
+            if idx < n_thresholds - 1:
+                story.append(Spacer(1, 0.4 * cm))
     story.append(PageBreak())
 
     story.append(_p("Module 3 \u2014 Gezondheidslast (DALY's)", st["h1"]))
     story.append(_p(
         "Dezelfde afstanden en hindernormen omgezet in Disability-Adjusted Life Years (WHO-maat voor "
         "gezondheidsverlies), gemonetariseerd volgens drie officiele Nederlandse overheidswaarden: "
-        "RIVM (\u20ac 50.000/DALY), PBL (\u20ac 70.000/DALY) en Zorginstituut Nederland (\u20ac 80.000/DALY).",
+        "RIVM (\u20ac 50.000/DALY), PBL (\u20ac 70.000/DALY) en Zorginstituut Nederland (\u20ac 80.000/DALY). "
+        "Per hindernorm een aparte tabel voor de leesbaarheid.",
         st["body"]
     ))
     if rows_data:
-        header1 = [
-            _p("Afstand", st["cellhead_xs"]),
-            _p("DALY-last 9%", st["cellhead_xs"]), "", "", "", "", "", "",
-            _p("DALY-last 30%", st["cellhead_xs"]), "", "", "", "", "", "",
-            _p("DALY-last 46%", st["cellhead_xs"]), "", "", "", "", "", "",
-        ]
-        sub = ["Pers.", "DALY", "RIVM/j", "RIVM25j", "PBL/j", "PBL25j", "ZiN/j", "ZiN25j"]
-        header2 = [""]
-        for _ in range(3):
-            header2 += [_p(s, st["cellhead_xs"]) for s in sub]
-        rows = [header1, header2]
-        for r in rows_data:
-            row = [_p(fmt_dist(r["afstand_m"]), st["cellnum_xs"])]
-            for d in r["drempels"]:
+        n_thresholds = len(rows_data[0]["drempels"])
+        col_w = [2.0*cm, 1.9*cm, 1.7*cm, 2.5*cm, 2.7*cm, 2.5*cm, 2.7*cm, 2.5*cm, 2.7*cm]
+        for idx in range(n_thresholds):
+            pct = rows_data[0]["drempels"][idx].get("drempel_pct")
+            label = _HINDERNORM_LABELS.get(pct, f"{fmt_num(pct, 0)}%" if pct is not None else f"Norm {idx + 1}")
+            story.append(_p(f"DALY-last bij hindernorm {label}", st["h3"]))
+            header = [_p(h, st["cellhead"]) for h in [
+                "Afstand", "Pers.", "DALY/jr",
+                "RIVM/jr", "RIVM 25jr", "PBL/jr", "PBL 25jr", "ZiN/jr", "ZiN 25jr",
+            ]]
+            rows = [header]
+            for r in rows_data:
+                d = r["drempels"][idx]
                 daly = d["daly"]
-                row += [
-                    _p(fmt_num(d["aantal_personen"], 0), st["cellnum_xs"]),
-                    _p(fmt_num(daly["daly_totaal_jaar"], 1), st["cellnum_xs"]),
-                    _p(fmt_euro_compact(daly["waarde_rivm_jaar_euro"]), st["cellnum_xs"]),
-                    _p(fmt_euro_compact(daly["waarde_rivm_25jaar_euro"]), st["cellnum_xs"]),
-                    _p(fmt_euro_compact(daly["waarde_pbl_jaar_euro"]), st["cellnum_xs"]),
-                    _p(fmt_euro_compact(daly["waarde_pbl_25jaar_euro"]), st["cellnum_xs"]),
-                    _p(fmt_euro_compact(daly["waarde_zin_jaar_euro"]), st["cellnum_xs"]),
-                    _p(fmt_euro_compact(daly["waarde_zin_25jaar_euro"]), st["cellnum_xs"]),
-                ]
-            rows.append(row)
-        col_w = [1.3*cm] + [0.75*cm, 0.7*cm, 0.95*cm, 1.15*cm, 0.95*cm, 1.15*cm, 0.95*cm, 1.15*cm] * 3
-        tbl = Table(rows, colWidths=col_w, repeatRows=2)
-        style = _table_style(
-            header_rows=2,
-            group_spans=[(1, 0, 8, 0), (9, 0, 16, 0), (17, 0, 24, 0)],
-        )
-        style.add("LEFTPADDING", (0, 0), (-1, -1), 2)
-        style.add("RIGHTPADDING", (0, 0), (-1, -1), 2)
-        style.add("TOPPADDING", (0, 0), (-1, -1), 2)
-        style.add("BOTTOMPADDING", (0, 0), (-1, -1), 2)
-        tbl.setStyle(style)
-        story.append(tbl)
+                rows.append([
+                    _p(fmt_dist(r["afstand_m"]), st["cellnum"]),
+                    _p(fmt_num(d["aantal_personen"], 0), st["cellnum"]),
+                    _p(fmt_num(daly["daly_totaal_jaar"], 1), st["cellnum"]),
+                    _p(fmt_euro_compact(daly["waarde_rivm_jaar_euro"]), st["cellnum"]),
+                    _p(fmt_euro_compact(daly["waarde_rivm_25jaar_euro"]), st["cellnum"]),
+                    _p(fmt_euro_compact(daly["waarde_pbl_jaar_euro"]), st["cellnum"]),
+                    _p(fmt_euro_compact(daly["waarde_pbl_25jaar_euro"]), st["cellnum"]),
+                    _p(fmt_euro_compact(daly["waarde_zin_jaar_euro"]), st["cellnum"]),
+                    _p(fmt_euro_compact(daly["waarde_zin_25jaar_euro"]), st["cellnum"]),
+                ])
+            tbl = Table(rows, colWidths=col_w, repeatRows=1, hAlign="LEFT")
+            tbl.setStyle(_table_style())
+            story.append(tbl)
+            if idx < n_thresholds - 1:
+                story.append(Spacer(1, 0.4 * cm))
+        story.append(Spacer(1, 0.2 * cm))
         story.append(_p(
-            "j = per jaar; 25j = cumulatief over 25 jaar; k = duizend euro, M = miljoen euro. "
+            "jr = per jaar; 25jr = cumulatief over 25 jaar. "
             "RIVM = \u20ac 50.000/DALY, PBL = \u20ac 70.000/DALY, "
             "ZiN = Zorginstituut Nederland = \u20ac 80.000/DALY.", st["small"]
         ))
