@@ -1168,15 +1168,41 @@
           throw new Error(detail);
         }
         const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'windturbine-rapport.pdf';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast('PDF-rapport gedownload.');
+        const fileName = 'windturbine-rapport.pdf';
+
+        // iOS/mobile Safari silently drops a script-triggered download once
+        // the click handler has done an `await` (the fetch above): it no
+        // longer counts the resulting a.click() as user-initiated, so
+        // nothing visibly happens. The Web Share sheet is the mechanism
+        // Apple does allow in this situation, so prefer it when available
+        // and fall back to the classic blob-download link everywhere else
+        // (desktop Chrome/Firefox/Edge/Safari all handle that fine).
+        let sharedViaOS = false;
+        try {
+          const file = new File([blob], fileName, { type: 'application/pdf' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: 'Windturbine-rapport' });
+            sharedViaOS = true;
+          }
+        } catch (shareErr) {
+          // User cancelling the share sheet also lands here (AbortError) -
+          // treat that as "handled", don't fall through to a second download.
+          if (shareErr && shareErr.name === 'AbortError') {
+            sharedViaOS = true;
+          }
+        }
+
+        if (!sharedViaOS) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+        showToast('PDF-rapport gegenereerd.');
       } catch (e) {
         console.error(e);
         showToast(e.message || 'Er ging iets mis bij het genereren van het rapport.', true);
