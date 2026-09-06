@@ -319,6 +319,7 @@
     style: 'https://tiles.openfreemap.org/styles/positron',
     center: [5.2913, 52.1326],
     zoom: 6.4,
+    preserveDrawingBuffer: true,
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
   map.getContainer().appendChild(createCompassRoseEl());
@@ -484,6 +485,7 @@
     style: 'https://tiles.openfreemap.org/styles/positron',
     center: [5.2913, 52.1326],
     zoom: 6.4,
+    preserveDrawingBuffer: true,
   });
   noiseMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
   noiseMap.getContainer().appendChild(createCompassRoseEl());
@@ -656,6 +658,7 @@
   const resultsTbody = document.getElementById('results-tbody');
   const resultsTotalRow = document.getElementById('results-total-row');
   let lastResult = null;
+  let lastNoiseResult = null;
   let sortKey = 'afstand_centroide_m';
   let sortAsc = true;
 
@@ -706,6 +709,7 @@
         });
         const noiseData = await noiseRes.json();
         if (!noiseRes.ok) throw new Error(noiseData.detail || 'Geluidsberekening mislukt');
+        lastNoiseResult = noiseData;
         renderNoiseResults(noiseData);
         renderDalyResults(noiseData);
       } catch (noiseErr) {
@@ -1112,6 +1116,76 @@
   });
 
   renderInvestGroupList();
+
+  const reportGenerateBtn = document.getElementById('report-generate-btn');
+  if (reportGenerateBtn) {
+    reportGenerateBtn.addEventListener('click', async () => {
+      if (!lastResult || !lastNoiseResult) {
+        showToast('Bereken eerst Module 1-3 (voer een locatie in en klik op "Berekenen").', true);
+        return;
+      }
+      reportGenerateBtn.disabled = true;
+      reportGenerateBtn.innerHTML = '<span class="spinner"></span> Rapport genereren\u2026';
+      try {
+        let map1Image = null;
+        let map2Image = null;
+        try {
+          map1Image = map.getCanvas().toDataURL('image/png');
+        } catch (imgErr) {
+          console.error('Kaart 1 kon niet worden vastgelegd', imgErr);
+        }
+        try {
+          map2Image = noiseMap.getCanvas().toDataURL('image/png');
+        } catch (imgErr) {
+          console.error('Kaart 2 kon niet worden vastgelegd', imgErr);
+        }
+
+        const res = await fetch(`${API}/api/generate-report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            turbines: turbines.map((t) => ({
+              label: t.label,
+              lat: t.lat,
+              lon: t.lon,
+              category: t.category,
+              category_label: (categories[t.category] && categories[t.category].label) || t.category,
+              method: t.method,
+            })),
+            module1: lastResult,
+            module23: lastNoiseResult,
+            module4: lastInvestResult,
+            map1_image: map1Image,
+            map2_image: map2Image,
+          }),
+        });
+        if (!res.ok) {
+          let detail = 'Rapport genereren mislukt';
+          try {
+            const errData = await res.json();
+            detail = errData.detail || detail;
+          } catch (_) {}
+          throw new Error(detail);
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'windturbine-rapport.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('PDF-rapport gedownload.');
+      } catch (e) {
+        console.error(e);
+        showToast(e.message || 'Er ging iets mis bij het genereren van het rapport.', true);
+      } finally {
+        reportGenerateBtn.disabled = false;
+        reportGenerateBtn.textContent = 'Download PDF-rapport';
+      }
+    });
+  }
 
   loadCategories();
   renderTurbineList();

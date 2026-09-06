@@ -23,11 +23,14 @@ import pyproj
 import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Response
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from shapely.geometry import Point, shape, mapping
 from shapely.ops import transform as shp_transform
+
+import report as report_module
 
 RD = "EPSG:28992"
 WGS84 = "EPSG:4326"
@@ -842,6 +845,24 @@ class InvestmentIn(BaseModel):
     groepen: list[TurbineGroepIn]
 
 
+class ReportTurbineIn(BaseModel):
+    label: str = "Turbine"
+    lat: float
+    lon: float
+    category: str = ""
+    category_label: str = ""
+    method: str = ""
+
+
+class ReportIn(BaseModel):
+    turbines: list[ReportTurbineIn] = []
+    module1: dict | None = None
+    module23: dict | None = None
+    module4: dict | None = None
+    map1_image: str | None = None
+    map2_image: str | None = None
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
@@ -966,6 +987,28 @@ def api_calculate_investment(payload: InvestmentIn):
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=422, detail=f"Berekening mislukt: {e}")
+
+
+@app.post("/api/generate-report")
+def api_generate_report(payload: ReportIn):
+    try:
+        data = {
+            "turbines": [t.model_dump() for t in payload.turbines],
+            "module1": payload.module1,
+            "module23": payload.module23,
+            "module4": payload.module4,
+            "map1_image": payload.map1_image,
+            "map2_image": payload.map2_image,
+        }
+        pdf_bytes = report_module.build_report_pdf(data)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename="windturbine-rapport.pdf"'},
+        )
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=422, detail=f"Rapport genereren mislukt: {e}")
 
 
 @app.get("/api/export/csv")
