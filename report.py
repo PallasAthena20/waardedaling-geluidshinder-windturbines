@@ -48,6 +48,30 @@ PAGE_SIZE = A4  # staand (portrait) formaat
 MARGIN = 1.4 * cm
 CONTENT_WIDTH = PAGE_SIZE[0] - 2 * MARGIN
 
+# Kleuren die exact overeenkomen met de kaartlegenda's op de website (app.js/style.css),
+# zodat de legenda in het PDF-rapport altijd bij de kleuren op de kaartafbeelding past.
+MODULE1_SEVERITY_LEGEND = [
+    ("#cfe4e0", "< 2%"),
+    ("#ffe08a", "2 - 3%"),
+    ("#ffb454", "3 - 4,5%"),
+    ("#f2793a", "4,5 - 6,5%"),
+    ("#d43d3d", "> 6,5%"),
+]
+MODULE2_DISTANCE_LEGEND = [
+    ("#0d6f66", "500 m"),
+    ("#3d8f7a", "800 m"),
+    ("#7aad5c", "1,3 km"),
+    ("#d69a3a", "2 km"),
+    ("#c8553d", "5 km"),
+]
+# Terugvalkleuren voor Module 2a-geluidssoorten, voor het geval een oudere
+# front-endversie nog geen 'color'-veld meestuurt met de sound_types-payload.
+MODULE2A_SOUND_COLOR_FALLBACK = {
+    "hoorbaar": "#0d6f66",
+    "laagfrequent": "#d69a3a",
+    "infrasoon": "#7a4fc8",
+}
+
 
 def _fit_widths(widths, available=None):
     """Schaalt een lijst kolombreedtes (in punten/cm) proportioneel zodat de
@@ -128,6 +152,14 @@ def _styles():
         "footer": ParagraphStyle(
             "Footer", parent=ss["Normal"], fontSize=6.8, leading=9,
             textColor=TEXT_MUTED,
+        ),
+        "legend": ParagraphStyle(
+            "Legend", parent=ss["Normal"], fontSize=7.4, leading=11.5,
+            textColor=colors.HexColor("#3d4a45"),
+        ),
+        "caption": ParagraphStyle(
+            "Caption", parent=ss["Normal"], fontSize=7.6, leading=10.5,
+            textColor=TEXT_MUTED, alignment=1, spaceBefore=3,
         ),
     }
     for key, sty in styles.items():
@@ -214,6 +246,59 @@ def _map_image_flowable(b64_str, max_w=None, max_h=9.5 * cm):
     iw, ih = reader.getSize()
     scale = min(max_w / iw, max_h / ih)
     return Image(io.BytesIO(raw), width=iw * scale, height=ih * scale)
+
+
+def _framed_image(img_flow, caption=None):
+    """Plaatst een kaartafbeelding in een nette kaderrand (zoals de kaartkaart op
+    de website), zodat de afbeelding nooit los/zonder begrenzing op de pagina staat.
+    Optioneel een onderschrift (bijv. 'Overdag') binnen hetzelfde kader."""
+    if img_flow is None:
+        return None
+    st = _styles()
+    pad = 0.22 * cm
+    border_allowance = 0.15 * cm  # marge voor de kaderlijn zelf, voorkomt overloop buiten de paginamarge
+    max_inner_w = CONTENT_WIDTH - 2 * pad - border_allowance
+    if img_flow.drawWidth > max_inner_w:
+        ratio = max_inner_w / img_flow.drawWidth
+        img_flow.drawWidth *= ratio
+        img_flow.drawHeight *= ratio
+    inner = [[img_flow]]
+    if caption:
+        inner.append([_p(caption, st["caption"])])
+    tbl = Table(inner, colWidths=[img_flow.drawWidth + 2 * pad])
+    style_cmds = [
+        ("BOX", (0, 0), (-1, -1), 0.9, BORDER),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+        ("TOPPADDING", (0, 0), (-1, 0), pad),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), pad if not caption else 2),
+        ("LEFTPADDING", (0, 0), (-1, -1), pad),
+        ("RIGHTPADDING", (0, 0), (-1, -1), pad),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+    ]
+    if caption:
+        style_cmds.append(("TOPPADDING", (0, 1), (-1, 1), 0))
+        style_cmds.append(("BOTTOMPADDING", (0, 1), (-1, 1), pad))
+    tbl.setStyle(TableStyle(style_cmds))
+    tbl.hAlign = "CENTER"
+    return tbl
+
+
+def _legend_line(items, wind_label=None):
+    """Bouwt een kleurenlegenda-regel (gekleurde bolletjes + labels) die exact
+    overeenkomt met de legenda onder de kaart op de website, zodat de kleuren
+    op de kaartafbeelding in het PDF-rapport altijd verklaard blijven."""
+    st = _styles()
+    parts = []
+    for color_hex, label in items:
+        if not label:
+            continue
+        parts.append(f'<font color="{color_hex}">\u25cf</font>&nbsp;{label}')
+    if wind_label:
+        parts.append(f'\u2197&nbsp;{wind_label}')
+    if not parts:
+        return None
+    text = "&nbsp;&nbsp;&nbsp;\u2022&nbsp;&nbsp;&nbsp;".join(parts)
+    return Paragraph(text, st["legend"])
 
 
 def _p(text, style):
@@ -335,7 +420,14 @@ def _build_module1(story, st, module1, map_img_b64):
 
     img_flow = _map_image_flowable(map_img_b64)
     if img_flow:
-        story.append(img_flow)
+        story.append(_framed_image(img_flow))
+        legend = _legend_line(
+            MODULE1_SEVERITY_LEGEND,
+            wind_label="Overheersende windrichting zuidwest (bron: KNMI)",
+        )
+        if legend:
+            story.append(Spacer(1, 0.15 * cm))
+            story.append(legend)
         story.append(Spacer(1, 0.3 * cm))
 
     t = module1.get("totalen", {})
@@ -397,7 +489,14 @@ def _build_module2(story, st, module23, map_img_b64):
     ))
     img_flow = _map_image_flowable(map_img_b64)
     if img_flow:
-        story.append(img_flow)
+        story.append(_framed_image(img_flow))
+        legend = _legend_line(
+            MODULE2_DISTANCE_LEGEND,
+            wind_label="Overheersende windrichting zuidwest (bron: KNMI)",
+        )
+        if legend:
+            story.append(Spacer(1, 0.15 * cm))
+            story.append(legend)
         story.append(Spacer(1, 0.3 * cm))
 
     rows_data = module23.get("rijen", [])
@@ -460,7 +559,15 @@ def _build_module2a(story, st, module2a, day_img_b64, night_img_b64):
         period_flow = [_p(_MODULE2A_PERIOD_LABELS.get(period, period), st["h3"])]
         img_flow = _map_image_flowable(img_b64, max_h=9.5 * cm)
         if img_flow:
-            period_flow.append(img_flow)
+            period_flow.append(_framed_image(img_flow))
+            legend_items = [
+                (s.get("color") or MODULE2A_SOUND_COLOR_FALLBACK.get(s.get("key"), "#0d6f66"), s.get("label"))
+                for s in sound_types
+            ]
+            legend = _legend_line(legend_items, wind_label="Gekozen windrichting")
+            if legend:
+                period_flow.append(Spacer(1, 0.15 * cm))
+                period_flow.append(legend)
             period_flow.append(Spacer(1, 0.2 * cm))
         if sound_types:
             header = [_p(h, st["cellhead"]) for h in ["Geluidssoort", "Reikwijdte upwind \u2013 downwind"]]
@@ -470,8 +577,9 @@ def _build_module2a(story, st, module2a, day_img_b64, night_img_b64):
                 base_km = p.get("base_km", 0)
                 min_km = base_km * p.get("upwind", 1)
                 max_km = base_km * p.get("downwind", 1)
+                s_color = s.get("color") or MODULE2A_SOUND_COLOR_FALLBACK.get(s.get("key"), "#0d6f66")
                 rows.append([
-                    _p(s.get("label", ""), st["cell"]),
+                    _p(f'<font color="{s_color}">\u25cf</font>&nbsp;{s.get("label", "")}', st["cell"]),
                     _p(f"{fmt_num(min_km, 1)} \u2013 {fmt_num(max_km, 1)} km", st["cellnum"]),
                 ])
             tbl = Table(rows, colWidths=_fit_widths([9 * cm, 9.2 * cm]), hAlign="LEFT")

@@ -1512,6 +1512,7 @@
           sound_types: MODULE2A_SOUND_TYPES.map((s) => ({
             key: s.key,
             label: s.label,
+            color: s.color,
             day: s.day,
             night: s.night,
           })),
