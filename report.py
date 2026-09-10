@@ -453,7 +453,7 @@ def _build_module1(story, st, module1, map_img_b64):
                 _p(fmt_dist(b.get("afstand_centroide_m", 0)), st["cellnum"]),
                 _p(fmt_num(b.get("geraakte_woningen"), 1), st["cellnum"]),
                 _p(fmt_euro(b.get("gemiddelde_woz")), st["cellnum"]),
-                _p(fmt_pct(b.get("gewogen_waardedaling_pct"), 2), st["cellnum"]),
+                _p(fmt_pct(abs(b.get("gewogen_waardedaling_pct") or 0), 2), st["cellnum"]),
                 _p(fmt_euro(b.get("totale_waardedaling_euro")), st["cellnum"]),
                 _p(fmt_euro(b.get("waardedaling_per_woning_euro")), st["cellnum"]),
                 _p(fmt_euro(b.get("nadeelcompensatie_euro")), st["cellnum"]),

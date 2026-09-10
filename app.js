@@ -53,6 +53,89 @@
   const fmtEuro = (n) => new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0);
   const fmtNum = (n, d) => new Intl.NumberFormat('nl-NL', { maximumFractionDigits: d ?? 0 }).format(n || 0);
   const fmtDist = (m) => (m >= 1000 ? fmtNum(m / 1000, 2) + ' km' : fmtNum(m) + ' m');
+  const fmtPct = (n, d) => fmtNum(n, d ?? 2) + '%';
+
+  /* ---------------------------------------------------------------------
+     Berekening-tooltips ("ballonnen") — elk data-calc-element toont bij
+     hover/focus/klik de exacte berekening (met echte, ingevulde waarden)
+     die tot dat getal heeft geleid.
+     --------------------------------------------------------------------- */
+  function attrEscape(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  // Wraps a rendered value in a hoverable/focusable span carrying the
+  // calculation text. `calcText` may contain literal \n for line breaks.
+  function calc(calcText, displayHtml) {
+    return `<span class="calc" tabindex="0" data-calc="${attrEscape(calcText)}">${displayHtml}</span>`;
+  }
+
+  (function initCalcTooltip() {
+    const tip = document.createElement('div');
+    tip.id = 'calc-tooltip';
+    tip.setAttribute('role', 'tooltip');
+    document.body.appendChild(tip);
+    let activeEl = null;
+
+    function place(el) {
+      const r = el.getBoundingClientRect();
+      tip.style.left = '0px';
+      tip.style.top = '0px';
+      tip.classList.add('visible');
+      const tipRect = tip.getBoundingClientRect();
+      let left = r.left + r.width / 2 - tipRect.width / 2;
+      left = Math.max(8, Math.min(left, window.innerWidth - tipRect.width - 8));
+      let top = r.top - tipRect.height - 10;
+      if (top < 8) top = r.bottom + 10;
+      tip.style.left = `${left}px`;
+      tip.style.top = `${top}px`;
+    }
+
+    function show(el) {
+      const text = el.getAttribute('data-calc');
+      if (!text) return;
+      activeEl = el;
+      tip.innerHTML = '<span class="calc-tooltip-label">Berekening</span>' + escapeHtml(text).replace(/\n/g, '<br>');
+      place(el);
+    }
+    function hide(el) {
+      if (el && el !== activeEl) return;
+      tip.classList.remove('visible');
+      activeEl = null;
+    }
+
+    document.addEventListener('mouseover', (e) => {
+      const el = e.target.closest('[data-calc]');
+      if (el) show(el);
+    });
+    document.addEventListener('mouseout', (e) => {
+      const el = e.target.closest('[data-calc]');
+      if (el) hide(el);
+    });
+    document.addEventListener('focusin', (e) => {
+      const el = e.target.closest('[data-calc]');
+      if (el) show(el);
+    });
+    document.addEventListener('focusout', (e) => {
+      const el = e.target.closest('[data-calc]');
+      if (el) hide(el);
+    });
+    // Touch: tap toggles the tooltip open/closed.
+    document.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-calc]');
+      if (!el) {
+        hide();
+        return;
+      }
+      if (activeEl === el) hide(el);
+      else show(el);
+    });
+    window.addEventListener('scroll', () => hide(), true);
+    window.addEventListener('resize', () => hide());
+  })();
 
   /* ---------------------------------------------------------------------
      Category info (loaded from backend)
@@ -383,7 +466,7 @@
         .setHTML(
           `<div class="popup-title">${escapeHtml(p.buurtnaam)} — ${escapeHtml(p.gemeentenaam)}</div>` +
             `<div class="popup-row"><span>Geraakte woningen</span><strong>${fmtNum(p.geraakte_woningen, 1)}</strong></div>` +
-            `<div class="popup-row"><span>Waardedaling</span><strong>${p.gewogen_waardedaling_pct}%</strong></div>` +
+            `<div class="popup-row"><span>Waardedaling</span><strong>${fmtNum(Math.abs(p.gewogen_waardedaling_pct), 2)}%</strong></div>` +
             `<div class="popup-row"><span>Gem. WOZ</span><strong>${fmtEuro(p.gemiddelde_woz)}</strong></div>` +
             `<div class="popup-row"><span>Totale waardedaling</span><strong>${fmtEuro(p.totale_waardedaling_euro)}</strong></div>`
         )
@@ -1072,21 +1155,35 @@
   function renderNoiseResults(data) {
     if (noiseEmpty) noiseEmpty.style.display = 'none';
     const rows = data.rijen || [];
+    const lwA = data.bronvermogen_dba ?? 108;
+    const lwLin = data.bronvermogen_db ?? 117;
+    const costPerPerson = data.kosten_per_persoon_per_jaar_euro ?? 609.6;
+    const horizonYears = data.kosten_horizon_jaar ?? 25;
     noiseTbody.innerHTML = rows
       .map((row) => {
-        const [t10, t30, t46] = row.drempels;
-        const cell = (d) => `
-          <td class="num">${fmtNum(d.aantal_woningen, 1)}</td>
-          <td class="num">${fmtEuro(d.kosten_per_jaar_euro)}</td>
-          <td class="num">${fmtEuro(d.kosten_25jaar_euro)}</td>`;
+        const [t9, t30, t46] = row.drempels;
+        const calcWoningen = `Woningen (fractioneel naar oppervlakte-aandeel) binnen ${fmtDist(row.afstand_m)} van de ingevoerde turbine(s), volgens CBS Wijken en Buurten.\nBij meerdere turbines wordt overlappend bereik niet dubbel geteld (vereniging van de cirkels).\n= ${fmtNum(row.aantal_woningen, 1)} woningen.`;
+        const calcDba = `RIVM-vuistregel voor geluidsverspreiding: Limm = Lw \u2212 20\u00d7log10(R) \u2212 9 \u2212 0,005\u00d7R\n= ${fmtNum(lwA, 1)} \u2212 20\u00d7log10(${fmtNum(row.afstand_m, 0)}) \u2212 9 \u2212 0,005\u00d7${fmtNum(row.afstand_m, 0)}\n= ${fmtNum(row.dba_7ms, 1)} dB(A) bij 7 m/s (A-gewogen bronvermogen ${fmtNum(lwA, 0)} dB(A)).`;
+        const calcDb = `Dezelfde RIVM-formule, met het lineaire (onweighted) bronvermogen:\nLimm = ${fmtNum(lwLin, 1)} \u2212 20\u00d7log10(${fmtNum(row.afstand_m, 0)}) \u2212 9 \u2212 0,005\u00d7${fmtNum(row.afstand_m, 0)}\n= ${fmtNum(row.db_onweighted, 1)} dB.`;
+        const calcHh = `Woning-gewogen gemiddelde CBS-huishoudensgrootte ('gemiddeldeHuishoudsgrootte') over alle buurten binnen ${fmtDist(row.afstand_m)}.\n= ${fmtNum(row.personen_per_huishouden, 2)} personen per huishouden.`;
+        const cell = (d) => {
+          const nPersonen = d.aantal_woningen * row.personen_per_huishouden;
+          const calcAantal = `Woningen binnen ${fmtDist(row.afstand_m)} x hinderdrempel ${d.drempel_pct}%:\n${fmtNum(row.aantal_woningen, 1)} \u00d7 ${d.drempel_pct}%\n= ${fmtNum(d.aantal_woningen, 1)} woningen.`;
+          const calcJaar = `Getroffen woningen \u00d7 personen per huishouden \u00d7 zorgkosten-kerncijfer:\n${fmtNum(d.aantal_woningen, 1)} \u00d7 ${fmtNum(row.personen_per_huishouden, 2)} = ${fmtNum(d.aantal_personen, 1)} personen\n${fmtNum(d.aantal_personen, 1)} \u00d7 \u20ac${fmtNum(costPerPerson, 2)}/persoon/jaar\n= ${fmtEuro(d.kosten_per_jaar_euro)} per jaar.`;
+          const calc25 = `Kosten per jaar \u00d7 ${horizonYears} jaar:\n${fmtEuro(d.kosten_per_jaar_euro)} \u00d7 ${horizonYears}\n= ${fmtEuro(d.kosten_25jaar_euro)}.`;
+          return `
+          <td class="num">${calc(calcAantal, fmtNum(d.aantal_woningen, 1))}</td>
+          <td class="num">${calc(calcJaar, fmtEuro(d.kosten_per_jaar_euro))}</td>
+          <td class="num">${calc(calc25, fmtEuro(d.kosten_25jaar_euro))}</td>`;
+        };
         return `
       <tr>
         <td class="num">${fmtDist(row.afstand_m)}</td>
-        <td class="num">${fmtNum(row.aantal_woningen, 1)}</td>
-        <td class="num">${fmtNum(row.dba_7ms, 1)} dB(A)</td>
-        <td class="num">${fmtNum(row.db_onweighted, 1)} dB</td>
-        <td class="num">${fmtNum(row.personen_per_huishouden, 2)}</td>
-        ${cell(t10)}
+        <td class="num">${calc(calcWoningen, fmtNum(row.aantal_woningen, 1))}</td>
+        <td class="num">${calc(calcDba, fmtNum(row.dba_7ms, 1) + ' dB(A)')}</td>
+        <td class="num">${calc(calcDb, fmtNum(row.db_onweighted, 1) + ' dB')}</td>
+        <td class="num">${calc(calcHh, fmtNum(row.personen_per_huishouden, 2))}</td>
+        ${cell(t9)}
         ${cell(t30)}
         ${cell(t46)}
       </tr>`;
@@ -1103,18 +1200,31 @@
     if (!dalyTbody) return;
     if (dalyEmpty) dalyEmpty.style.display = 'none';
     const rows = data.rijen || [];
+    const dwSlaap = data.daly_dw_slaapverstoring ?? 0.01;
+    const dwHinder = data.daly_dw_ernstige_hinder ?? 0.011;
+    const dwTotaal = dwSlaap + dwHinder;
+    const waardeRivm = data.daly_waarde_rivm_euro ?? 50000;
+    const waardePbl = data.daly_waarde_pbl_euro ?? 70000;
+    const waardeZin = data.daly_waarde_zin_euro ?? 80000;
+    const horizonYears = data.kosten_horizon_jaar ?? 25;
     dalyTbody.innerHTML = rows
       .map((row) => {
         const [t9, t30, t46] = row.drempels;
-        const cell = (d) => `
-          <td class="num">${fmtNum(d.aantal_personen, 1)}</td>
-          <td class="num">${fmtNum(d.daly.daly_totaal_jaar, 2)}</td>
-          <td class="num">${fmtEuro(d.daly.waarde_rivm_jaar_euro)}</td>
-          <td class="num">${fmtEuro(d.daly.waarde_rivm_25jaar_euro)}</td>
-          <td class="num">${fmtEuro(d.daly.waarde_pbl_jaar_euro)}</td>
-          <td class="num">${fmtEuro(d.daly.waarde_pbl_25jaar_euro)}</td>
-          <td class="num">${fmtEuro(d.daly.waarde_zin_jaar_euro)}</td>
-          <td class="num">${fmtEuro(d.daly.waarde_zin_25jaar_euro)}</td>`;
+        const cell = (d) => {
+          const calcPersonen = `Woningen bij deze hinderdrempel (${d.drempel_pct}%) x personen per huishouden op ${fmtDist(row.afstand_m)}:\n${fmtNum(d.aantal_woningen, 1)} \u00d7 ${fmtNum(row.personen_per_huishouden, 2)}\n= ${fmtNum(d.aantal_personen, 1)} personen.`;
+          const calcDalyJaar = `Getroffen personen x (disability weight slaapverstoring + disability weight ernstige hinder):\n${fmtNum(d.aantal_personen, 1)} \u00d7 (${fmtNum(dwSlaap, 3)} + ${fmtNum(dwHinder, 3)})\n= ${fmtNum(d.aantal_personen, 1)} \u00d7 ${fmtNum(dwTotaal, 3)}\n= ${fmtNum(d.daly.daly_totaal_jaar, 2)} DALY per jaar.`;
+          const calcWaarde = (waardeEuro, jaarVal, key) => `DALY per jaar \u00d7 monetaire DALY-waarde (${key}):\n${fmtNum(d.daly.daly_totaal_jaar, 2)} \u00d7 ${fmtEuro(waardeEuro)}\n= ${fmtEuro(jaarVal)} per jaar.`;
+          const calc25 = (jaarVal, horizonVal) => `Waarde per jaar \u00d7 ${horizonYears} jaar:\n${fmtEuro(jaarVal)} \u00d7 ${horizonYears}\n= ${fmtEuro(horizonVal)}.`;
+          return `
+          <td class="num">${calc(calcPersonen, fmtNum(d.aantal_personen, 1))}</td>
+          <td class="num">${calc(calcDalyJaar, fmtNum(d.daly.daly_totaal_jaar, 2))}</td>
+          <td class="num">${calc(calcWaarde(waardeRivm, d.daly.waarde_rivm_jaar_euro, 'RIVM basisscenario, \u20ac50.000/DALY'), fmtEuro(d.daly.waarde_rivm_jaar_euro))}</td>
+          <td class="num">${calc(calc25(d.daly.waarde_rivm_jaar_euro, d.daly.waarde_rivm_25jaar_euro), fmtEuro(d.daly.waarde_rivm_25jaar_euro))}</td>
+          <td class="num">${calc(calcWaarde(waardePbl, d.daly.waarde_pbl_jaar_euro, 'PBL, \u20ac70.000/DALY'), fmtEuro(d.daly.waarde_pbl_jaar_euro))}</td>
+          <td class="num">${calc(calc25(d.daly.waarde_pbl_jaar_euro, d.daly.waarde_pbl_25jaar_euro), fmtEuro(d.daly.waarde_pbl_25jaar_euro))}</td>
+          <td class="num">${calc(calcWaarde(waardeZin, d.daly.waarde_zin_jaar_euro, 'Zorginstituut Nederland, \u20ac80.000/DALY'), fmtEuro(d.daly.waarde_zin_jaar_euro))}</td>
+          <td class="num">${calc(calc25(d.daly.waarde_zin_jaar_euro, d.daly.waarde_zin_25jaar_euro), fmtEuro(d.daly.waarde_zin_25jaar_euro))}</td>`;
+        };
         return `
       <tr>
         <td class="num">${fmtDist(row.afstand_m)}</td>
@@ -1140,25 +1250,29 @@
       .join('');
 
     const t = data.totalen;
+    const kpiWoningenCalc = `Som van de kolom 'Woningen' in de tabel hieronder, over alle ${t.aantal_buurten} getroffen buurten samen:\n${fmtNum(t.totaal_geraakte_woningen, 1)} woningen in totaal.\nPer buurt = woningvoorraad van die buurt x aandeel van de buurt dat binnen het invloedsgebied van een turbine ligt.`;
+    const kpiWaardedalingCalc = `Som van de kolom 'Totale waardedaling' over alle ${t.aantal_buurten} buurten = ${fmtEuro(t.totale_waardedaling_euro)}.\nGemiddeld per woning = Totale waardedaling / Geraakte woningen\n= ${fmtEuro(t.totale_waardedaling_euro)} / ${fmtNum(t.totaal_geraakte_woningen, 1)}\n= ${fmtEuro(t.gemiddelde_waardedaling_per_woning_euro)} per woning.`;
+    const kpiEigenRisicoCalc = `Som van de kolom 'Eigen risico (\u22644%)' over alle buurten.\nPer buurt = Totale waardedaling \u2212 Compensabele planschade (het deel van de waardedaling tot en met de wettelijke 4%-drempel van het normaal maatschappelijk risico, dat voor rekening van de eigenaar/omwonende blijft).\nTotaal = ${fmtEuro(t.totaal_normaal_maatschappelijk_risico_euro)}.`;
+    const kpiCompensabelCalc = `Som van de kolom 'Compensabel (>4%)' over alle buurten = ${fmtEuro(t.totaal_nadeelcompensatie_euro)}.\nPer buurt = Geraakte woningen x Gem. WOZ x max(0, |Waardedaling %| \u2212 4%) \u2014 dus alleen het deel van de waardedaling BOVEN de 4%-NMR-drempel.\nGemiddeld per woning = ${fmtEuro(t.totaal_nadeelcompensatie_euro)} / ${fmtNum(t.totaal_geraakte_woningen, 1)} = ${fmtEuro(t.gemiddelde_nadeelcompensatie_per_woning_euro)}.`;
     kpiGrid.innerHTML = `
       <div class="kpi-card accent">
         <div class="kpi-label">Geraakte woningen</div>
-        <div class="kpi-value">${fmtNum(t.totaal_geraakte_woningen, 0)}</div>
+        <div class="kpi-value">${calc(kpiWoningenCalc, fmtNum(t.totaal_geraakte_woningen, 0))}</div>
         <div class="kpi-sub">verdeeld over ${t.aantal_buurten} buurten</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">Totale waardedaling</div>
-        <div class="kpi-value">${fmtEuro(t.totale_waardedaling_euro)}</div>
+        <div class="kpi-value">${calc(kpiWaardedalingCalc, fmtEuro(t.totale_waardedaling_euro))}</div>
         <div class="kpi-sub">gem. ${fmtEuro(t.gemiddelde_waardedaling_per_woning_euro)} per woning</div>
       </div>
       <div class="kpi-card warning">
         <div class="kpi-label">Eigen risico (NMR, tot 4%)</div>
-        <div class="kpi-value">${fmtEuro(t.totaal_normaal_maatschappelijk_risico_euro)}</div>
+        <div class="kpi-value">${calc(kpiEigenRisicoCalc, fmtEuro(t.totaal_normaal_maatschappelijk_risico_euro))}</div>
         <div class="kpi-sub">komt voor rekening van de eigenaar</div>
       </div>
       <div class="kpi-card success">
         <div class="kpi-label">Compensabele planschade (&gt;4%)</div>
-        <div class="kpi-value">${fmtEuro(t.totaal_nadeelcompensatie_euro)}</div>
+        <div class="kpi-value">${calc(kpiCompensabelCalc, fmtEuro(t.totaal_nadeelcompensatie_euro))}</div>
         <div class="kpi-sub">gem. ${fmtEuro(t.gemiddelde_nadeelcompensatie_per_woning_euro)} per woning</div>
       </div>
     `;
@@ -1177,20 +1291,28 @@
       return sortAsc ? va - vb : vb - va;
     });
     resultsTbody.innerHTML = rows
-      .map(
-        (b) => `
+      .map((b) => {
+        const pctAbs = Math.abs(b.gewogen_waardedaling_pct);
+        const aandeelPct = (b.aandeel_binnen_invloedsgebied || 0) * 100;
+        const calcWoningen = `Woningvoorraad van deze buurt x aandeel van de buurt binnen het invloedsgebied van een turbine:\n${fmtNum(b.woningvoorraad_totaal, 0)} woningen x ${fmtNum(aandeelPct, 1)}%\n= ${fmtNum(b.geraakte_woningen, 1)} geraakte woningen.`;
+        const calcWoz = `Gemiddelde WOZ-waarde van deze buurt volgens CBS Wijken en Buurten (meest recente publicatie).\nGeen berekening \u2014 dit is een brongegeven, geen afgeleide waarde.`;
+        const calcPct = `Oppervlaktegewogen gemiddelde van het effect (uit het Dro\u00ebs & Koster-model) over alle turbine-invloedringen die deze buurt raken.\nHet zwaarst getroffen deel van deze buurt daalt met ${fmtNum(Math.abs(b.max_waardedaling_pct), 2)}%; gemiddeld over de hele geraakte oppervlakte van de buurt is dat ${fmtNum(pctAbs, 2)}%.`;
+        const calcTotaal = `Geraakte woningen x Gem. WOZ-waarde x |Waardedaling %|:\n${fmtNum(b.geraakte_woningen, 1)} x ${fmtEuro(b.gemiddelde_woz)} x ${fmtNum(pctAbs, 2)}%\n= ${fmtEuro(b.totale_waardedaling_euro)}.`;
+        const calcEigenRisico = `Totale waardedaling \u2212 Compensabele planschade (het deel tot en met de 4%-drempel van het normaal maatschappelijk risico, voor rekening van de eigenaar):\n${fmtEuro(b.totale_waardedaling_euro)} \u2212 ${fmtEuro(b.nadeelcompensatie_euro)}\n= ${fmtEuro(b.eigen_risico_euro)}.`;
+        const calcNadeel = `Voor het deel van de buurt waar de waardedaling boven de 4%-NMR-drempel uitkomt:\nGeraakte woningen (dat deel) x Gem. WOZ x (|effect| \u2212 4%), opgeteld over alle ring-delen van deze buurt.\nGelijk aan: Totale waardedaling \u2212 Eigen risico = ${fmtEuro(b.totale_waardedaling_euro)} \u2212 ${fmtEuro(b.eigen_risico_euro)} = ${fmtEuro(b.nadeelcompensatie_euro)}.`;
+        return `
       <tr>
         <td>${escapeHtml(b.buurtnaam || '—')}</td>
         <td>${escapeHtml(b.gemeentenaam || '—')}</td>
         <td class="num">${fmtDist(b.afstand_centroide_m)}</td>
-        <td class="num">${fmtNum(b.geraakte_woningen, 1)}</td>
-        <td class="num">${fmtEuro(b.gemiddelde_woz)}</td>
-        <td class="num"><span class="severity-chip" style="background:${severityHex(b.gewogen_waardedaling_pct)}22;color:${severityHex(b.gewogen_waardedaling_pct)}"><span class="dot" style="background:${severityHex(b.gewogen_waardedaling_pct)}"></span>${b.gewogen_waardedaling_pct}%</span></td>
-        <td class="num">${fmtEuro(b.totale_waardedaling_euro)}</td>
-        <td class="num">${fmtEuro(b.eigen_risico_euro)}</td>
-        <td class="num">${fmtEuro(b.nadeelcompensatie_euro)}</td>
-      </tr>`
-      )
+        <td class="num">${calc(calcWoningen, fmtNum(b.geraakte_woningen, 1))}</td>
+        <td class="num">${calc(calcWoz, fmtEuro(b.gemiddelde_woz))}</td>
+        <td class="num">${calc(calcPct, `<span class="severity-chip" style="background:${severityHex(b.gewogen_waardedaling_pct)}22;color:${severityHex(b.gewogen_waardedaling_pct)}"><span class="dot" style="background:${severityHex(b.gewogen_waardedaling_pct)}"></span>${fmtNum(pctAbs, 2)}%</span>`)}</td>
+        <td class="num">${calc(calcTotaal, fmtEuro(b.totale_waardedaling_euro))}</td>
+        <td class="num">${calc(calcEigenRisico, fmtEuro(b.eigen_risico_euro))}</td>
+        <td class="num">${calc(calcNadeel, fmtEuro(b.nadeelcompensatie_euro))}</td>
+      </tr>`;
+      })
       .join('');
 
     const t = lastResult.totalen;
@@ -1381,26 +1503,34 @@
     `;
 
     investTbody.innerHTML = data.rijen
-      .map(
-        (r) => `
+      .map((r) => {
+        const calcVermogenTotaal = `Vermogen per turbine \u00d7 aantal turbines:\n${fmtNum(r.vermogen_per_turbine_mw, 2)} MW \u00d7 ${fmtNum(r.aantal_turbines, 0)}\n= ${fmtNum(r.vermogen_totaal_mw, 2)} MW.`;
+        const calcInvesteringPerTurbine = `Investering totaal / aantal turbines:\n${fmtEuro(r.investering_totaal_euro)} / ${fmtNum(r.aantal_turbines, 0)}\n= ${fmtEuro(r.investering_per_turbine_euro)}.`;
+        const calcTurbineprijsPerTurbine = `Turbineprijs totaal / aantal turbines:\n${fmtEuro(r.turbineprijs_totaal_euro)} / ${fmtNum(r.aantal_turbines, 0)}\n= ${fmtEuro(r.turbineprijs_per_turbine_euro)}.`;
+        const calcInvesteringTotaal = `Vermogen totaal (in kW) \u00d7 investering per kW voor categorie '${escapeHtml(r.hoofdcategorie_label)}':\n${fmtNum(r.vermogen_totaal_mw * 1000, 0)} kW \u00d7 ${fmtEuro(r.investering_per_kw_euro)}/kW\n= ${fmtEuro(r.investering_totaal_euro)}.`;
+        const calcVollasturen = `Vaste tabelwaarde (bron: PBL-eindadvies SDE++) voor windsnelheidscategorie '${escapeHtml(r.windcategorie)}' en turbinetype '${escapeHtml(r.hoofdcategorie_label)}'.\nGeen berekening \u2014 dit is een brongegeven.\n= ${fmtNum(r.vollasturen, 0)} vollasturen/jaar.`;
+        const calcJaarproductie = `Vermogen totaal \u00d7 vollasturen \u00d7 (1 \u2212 windparkverlies):\n${fmtNum(r.vermogen_totaal_mw, 2)} MW \u00d7 ${fmtNum(r.vollasturen, 0)} \u00d7 (1 \u2212 ${fmtNum(r.windparkverlies_pct, 0)}%)\n= ${fmtNum(r.jaarproductie_mwh, 0)} MWh/jaar.`;
+        const calcKostenJaar1 = `Investering totaal / jaarproductie:\n${fmtEuro(r.investering_totaal_euro)} / ${fmtNum(r.jaarproductie_mwh, 0)} MWh\n= ${fmtEuroDec(r.kosten_per_mwh_jaar1_euro)}/MWh in jaar 1.`;
+        const calcKostenLevensduur = `Investering totaal / (jaarproductie \u00d7 economische levensduur van ${fmtNum(r.levensduur_jaar, 0)} jaar):\n${fmtEuro(r.investering_totaal_euro)} / (${fmtNum(r.jaarproductie_mwh, 0)} \u00d7 ${fmtNum(r.levensduur_jaar, 0)})\n= ${fmtEuroDec(r.kosten_per_mwh_levensduur_euro)}/MWh.`;
+        return `
       <tr>
         <td>${escapeHtml(r.label)}</td>
         <td>${escapeHtml(r.hoofdcategorie_label)}</td>
         <td class="num">${escapeHtml(r.windcategorie)}</td>
         <td class="num">${fmtNum(r.vermogen_per_turbine_mw, 2)} MW</td>
         <td class="num">${fmtNum(r.aantal_turbines, 0)}</td>
-        <td class="num">${fmtNum(r.vermogen_totaal_mw, 2)} MW</td>
+        <td class="num">${calc(calcVermogenTotaal, fmtNum(r.vermogen_totaal_mw, 2) + ' MW')}</td>
         <td class="num">${fmtEuro(r.turbineprijs_per_kw_euro)}</td>
         <td class="num">${fmtEuro(r.investering_per_kw_euro)}</td>
-        <td class="num">${fmtEuro(r.turbineprijs_per_turbine_euro)}</td>
-        <td class="num">${fmtEuro(r.investering_per_turbine_euro)}</td>
-        <td class="num">${fmtEuro(r.investering_totaal_euro)}</td>
-        <td class="num">${fmtNum(r.vollasturen, 0)}</td>
-        <td class="num">${fmtNum(r.jaarproductie_mwh, 0)}</td>
-        <td class="num">${fmtEuroDec(r.kosten_per_mwh_jaar1_euro)}</td>
-        <td class="num">${fmtEuroDec(r.kosten_per_mwh_levensduur_euro)}</td>
-      </tr>`
-      )
+        <td class="num">${calc(calcTurbineprijsPerTurbine, fmtEuro(r.turbineprijs_per_turbine_euro))}</td>
+        <td class="num">${calc(calcInvesteringPerTurbine, fmtEuro(r.investering_per_turbine_euro))}</td>
+        <td class="num">${calc(calcInvesteringTotaal, fmtEuro(r.investering_totaal_euro))}</td>
+        <td class="num">${calc(calcVollasturen, fmtNum(r.vollasturen, 0))}</td>
+        <td class="num">${calc(calcJaarproductie, fmtNum(r.jaarproductie_mwh, 0))}</td>
+        <td class="num">${calc(calcKostenJaar1, fmtEuroDec(r.kosten_per_mwh_jaar1_euro))}</td>
+        <td class="num">${calc(calcKostenLevensduur, fmtEuroDec(r.kosten_per_mwh_levensduur_euro))}</td>
+      </tr>`;
+      })
       .join('');
 
     investTotalRow.innerHTML = `
